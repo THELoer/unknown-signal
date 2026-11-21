@@ -3,15 +3,15 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use lightyear::connection::server::Start;
-use lightyear::prelude::client::{ClientPlugins, Connect, RawClient, Remote};
+use lightyear::prelude::client::{ClientPlugins, Connect, Remote};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
+use lightyear::connection::host::HostClient;
 use lightyear::prelude::{
     AppComponentExt, Client, Connected, Link, LocalAddr, NetworkTarget, PeerAddr, Replicate,
     ReplicationReceiver, ReplicationSender, UdpIo,
 };
 
 const SERVER_PORT: u16 = 5000;
-const HOST_CLIENT_PORT: u16 = 5001;
 const TICK_RATE: f64 = 64.0;
 
 #[derive(Clone, Copy, Debug)]
@@ -93,13 +93,15 @@ fn start_requested_session(
                 .id();
             commands.trigger(Start { entity: server });
 
-            let local_client_addr =
-                SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), HOST_CLIENT_PORT);
-            spawn_client(
-                &mut commands,
-                local_client_addr,
-                SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), SERVER_PORT),
-            );
+            // Host mode uses Lightyear's in-process host-client topology.
+            // A loopback UDP client is a separate peer and does not form a host pair.
+            let mut host_client = commands.spawn((
+                Client,
+                LinkOf { endpoint: server },
+                Link::default(),
+                ReplicationReceiver,
+            ));
+            host_client.trigger(Connect::from);
 
             status.mode = Some(NetworkMode::Host);
             status.message = format!("Starting host on 0.0.0.0:{SERVER_PORT}...");
@@ -132,11 +134,14 @@ fn add_replication_sender(
     trigger: On<Add<Connected>>,
     mut commands: Commands,
     server_links: Query<(), With<LinkOf>>,
+    host_clients: Query<(), With<HostClient>>,
     players: Query<Entity, With<crate::player::Player>>,
 ) {
     // Host mode also has a local client endpoint. Only server-side peer links
     // should receive a replication sender.
-    if server_links.get(trigger.entity).is_ok() {
+    if server_links.get(trigger.entity).is_ok()
+        && !host_clients.get(trigger.entity).unwrap_or(false)
+    {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
             commands
@@ -186,7 +191,11 @@ fn spawn_remote_player_visuals(
     for (entity, _) in &remote_players {
         commands
             .entity(entity)
-            .insert(RemotePlayerVisual)
+            .insert((
+                RemotePlayerVisual,
+                Visibility::default(),
+                InheritedVisibility::default(),
+            ))
             .with_child((
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(material.clone()),
