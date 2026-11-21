@@ -31,7 +31,7 @@ impl Plugin for PlayerPlugin {
 #[require(
     RigidBody::Kinematic,
     CustomPositionIntegration,
-    SpeculativeMargin(0.0)
+    SpeculativeCcd(0.0)
 )]
 struct Player;
 
