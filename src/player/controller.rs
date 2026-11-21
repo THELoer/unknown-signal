@@ -114,7 +114,8 @@ impl Plugin for PlayerPlugin {
                     .chain()
                     .after(InputSystems),
             )
-            .add_systems(FixedUpdate, move_player);
+            .add_systems(FixedUpdate, move_player)
+            .add_systems(Update, update_camera_stance);
     }
 }
 
@@ -242,6 +243,27 @@ fn spawn_player(mut commands: Commands) {
     info!(
         "Player controls: WASD move, mouse look, Shift sprint, Ctrl crouch, Space jump, E interact, Esc release cursor"
     );
+}
+
+fn update_camera_stance(
+    time: Res<Time>,
+    players: Query<&PlayerStance, With<Player>>,
+    mut cameras: Query<&mut Transform, With<PlayerCamera>>,
+) {
+    let Ok(stance) = players.single() else {
+        return;
+    };
+
+    let target_height = if stance.crouched {
+        EYE_HEIGHT - STANCE_HEIGHT_DELTA
+    } else {
+        EYE_HEIGHT
+    };
+    let blend = 1.0 - (-12.0 * time.delta_secs()).exp();
+
+    for mut transform in &mut cameras {
+        transform.translation.y += (target_height - transform.translation.y) * blend;
+    }
 }
 
 fn capture_player_input(
