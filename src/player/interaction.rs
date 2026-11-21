@@ -32,7 +32,10 @@ pub struct InteractionPlugin;
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HeldItem>()
-            .add_systems(Startup, (spawn_test_door, spawn_test_pickup, spawn_interaction_hud))
+            .add_systems(
+                Startup,
+                (spawn_test_door, spawn_test_pickup, spawn_interaction_hud),
+            )
             .add_systems(
                 Update,
                 (update_interaction_hud, interact_with_door, animate_doors).chain(),
