@@ -278,6 +278,160 @@ fn spawn_test_scene(
         ));
     }
 
+    // Cable trays and conduit runs break up the otherwise flat ceiling silhouette.
+    for x in [-6.6, 6.6] {
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            trim.clone(),
+            Vec3::new(0.18, 0.18, 11.5),
+            Vec3::new(x, 4.48, 0.0),
+            false,
+        );
+        for z in [-5.0, -2.5, 0.0, 2.5, 5.0] {
+            spawn_box(
+                &mut commands,
+                cube.clone(),
+                panel.clone(),
+                Vec3::new(0.34, 0.06, 0.16),
+                Vec3::new(x, 4.37, z),
+                false,
+            );
+        }
+    }
+
+    // Recessed wall vents: repeated slats create readable industrial detail at a distance.
+    for x in [-3.2, 3.2] {
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            trim.clone(),
+            Vec3::new(1.75, 1.22, 0.16),
+            Vec3::new(x, 2.75, -7.72),
+            false,
+        );
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            panel.clone(),
+            Vec3::new(1.58, 1.05, 0.08),
+            Vec3::new(x, 2.75, -7.61),
+            false,
+        );
+        for y in [2.34, 2.48, 2.62, 2.76, 2.90, 3.04, 3.18] {
+            spawn_box(
+                &mut commands,
+                cube.clone(),
+                trim.clone(),
+                Vec3::new(1.48, 0.045, 0.07),
+                Vec3::new(x, y, -7.54),
+                false,
+            );
+        }
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            hazard.clone(),
+            Vec3::new(0.34, 0.07, 0.035),
+            Vec3::new(x + 0.58, 3.43, -7.53),
+            false,
+        );
+    }
+
+    // Exposed service pipes follow the left wall and turn down into the floor.
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        trim.clone(),
+        Vec3::new(0.18, 0.18, 11.8),
+        Vec3::new(-7.48, 3.95, 0.0),
+        false,
+    );
+    for z in [-5.5, -1.5, 2.5, 6.0] {
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            panel.clone(),
+            Vec3::new(0.24, 0.24, 0.24),
+            Vec3::new(-7.48, 3.95, z),
+            false,
+        );
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            trim.clone(),
+            Vec3::new(0.16, 2.0, 0.16),
+            Vec3::new(-7.48, 2.85, z),
+            false,
+        );
+    }
+
+    // Floor access panels use a dark border and a raised service plate.
+    for z in [-3.5, 4.5] {
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            trim.clone(),
+            Vec3::new(1.8, 0.035, 1.25),
+            Vec3::new(5.2, 0.018, z),
+            false,
+        );
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            panel.clone(),
+            Vec3::new(1.62, 0.045, 1.07),
+            Vec3::new(5.2, 0.045, z),
+            false,
+        );
+        for x in [4.65, 5.2, 5.75] {
+            spawn_box(
+                &mut commands,
+                cube.clone(),
+                trim.clone(),
+                Vec3::new(0.035, 0.012, 0.82),
+                Vec3::new(x, 0.072, z),
+                false,
+            );
+        }
+    }
+
+    // A wall-mounted maintenance terminal gives the room a strong interaction landmark.
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        trim.clone(),
+        Vec3::new(0.20, 1.45, 1.15),
+        Vec3::new(7.72, 2.05, 0.8),
+        false,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        panel.clone(),
+        Vec3::new(0.08, 0.88, 0.82),
+        Vec3::new(7.59, 2.18, 0.8),
+        false,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        lamp_material.clone(),
+        Vec3::new(0.035, 0.12, 0.48),
+        Vec3::new(7.53, 2.62, 0.8),
+        false,
+    );
+    for z in [0.48, 0.8, 1.12] {
+        spawn_box(
+            &mut commands,
+            cube.clone(),
+            hazard.clone(),
+            Vec3::new(0.035, 0.035, 0.12),
+            Vec3::new(7.53, 1.82, z),
+            false,
+        );
+    }
+
     // Retain one physics test object, now styled as a low industrial console.
     spawn_box(
         &mut commands,
