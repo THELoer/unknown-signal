@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 avian3d = "0.8.0"
 bevy = { version = "0.20.1", features = ["serialize"] }
-lightyear = { version = "0.31.0", features = ["raw_connection", "udp"] }
+lightyear = { version = "0.31.0", features = ["raw_connection", "udp", "input_native"] }
 serde = { version = "1.0", features = ["derive"] }
 
 # Bevy's unoptimized dev build can run at very low frame rates.
