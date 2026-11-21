@@ -1,6 +1,6 @@
 mod controller;
 
-pub use controller::{GameplayActive, PlayerPlugin};
+pub use controller::{ControlAction, GameplayActive, PlayerPlugin, PlayerSettings};
 mod interaction;
 
 pub use interaction::InteractionPlugin;
