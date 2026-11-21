@@ -325,13 +325,8 @@ fn spawn_box(
     }
 }
 
-
 /// Keeps the rendered floor and its physics shape in the same explicit world-space dimensions.
-fn spawn_floor(
-    commands: &mut Commands,
-    cube: Handle<Mesh>,
-    material: Handle<StandardMaterial>,
-) {
+fn spawn_floor(commands: &mut Commands, cube: Handle<Mesh>, material: Handle<StandardMaterial>) {
     commands.spawn((
         Mesh3d(cube),
         MeshMaterial3d(material),
