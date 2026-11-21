@@ -134,7 +134,7 @@ fn spawn_frame_piece(
         Mesh3d(mesh),
         MeshMaterial3d(material),
         RigidBody::Static,
-        Collider::cuboid(size.x * 0.5, size.y * 0.5, size.z * 0.5),
+        Collider::cuboid(0.5, 0.5, 0.5),
         Transform::from_translation(position).with_scale(size),
     ));
 }
