@@ -4,7 +4,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use lightyear::connection::server::Start;
 use lightyear::prelude::client::{ClientPlugins, Connect, RawClient, UdpIo};
-use lightyear::prelude::server::{RawServer, ServerPlugins, ServerUdpIo};
+use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::prelude::{
     Client, Connected, Link, LocalAddr, PeerAddr, ReplicationReceiver, ReplicationSender,
 };
@@ -117,9 +117,17 @@ fn spawn_client(
     client.trigger(Connect::from);
 }
 
-fn add_replication_sender(trigger: On<Add<Connected>>, mut commands: Commands) {
-    commands.entity(trigger.entity).insert(ReplicationSender);
-    info!("A client connected; replication sender enabled");
+fn add_replication_sender(
+    trigger: On<Add<Connected>>,
+    mut commands: Commands,
+    server_links: Query<(), With<LinkOf>>,
+) {
+    // Host mode also has a local client endpoint. Only server-side peer links
+    // should receive a replication sender.
+    if server_links.get(trigger.entity).is_ok() {
+        commands.entity(trigger.entity).insert(ReplicationSender);
+        info!("A remote client connected; replication sender enabled");
+    }
 }
 
 fn monitor_connection(
