@@ -11,8 +11,8 @@ const PLAYER_RADIUS: f32 = 0.35;
 const STANDING_CAPSULE_LENGTH: f32 = 1.1;
 const CROUCHED_CAPSULE_LENGTH: f32 = 0.45;
 const STANCE_HEIGHT_DELTA: f32 = (STANDING_CAPSULE_LENGTH - CROUCHED_CAPSULE_LENGTH) * 0.5;
-const EYE_HEIGHT: f32 = 0.55;
-const MOUSE_SENSITIVITY: f32 = 0.0022;
+pub(super) const EYE_HEIGHT: f32 = 0.55;
+const MOUSE_SENSITIVITY: f32 = 0.0030;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.05;
 
 pub struct PlayerPlugin;
@@ -33,13 +33,13 @@ impl Plugin for PlayerPlugin {
     CustomPositionIntegration,
     SpeculativeCcd::new(0.0)
 )]
-struct Player;
+pub(super) struct Player;
 
 #[derive(Component)]
-struct PlayerCamera;
+pub(super) struct PlayerCamera;
 
 #[derive(Component, Default)]
-struct CameraPitch(f32);
+pub(super) struct CameraPitch(pub(super) f32);
 
 #[derive(Component, Default)]
 struct PlayerStance {
@@ -100,7 +100,7 @@ fn spawn_player(mut commands: Commands) {
         ));
 
     info!(
-        "Player controls: WASD move, mouse look, Shift sprint, Ctrl crouch, Space jump, Esc release cursor"
+        "Player controls: WASD move, mouse look, Shift sprint, Ctrl crouch, Space jump, E interact, Esc release cursor"
     );
 }
 
