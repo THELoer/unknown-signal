@@ -125,7 +125,7 @@ impl Plugin for PlayerPlugin {
     CustomPositionIntegration,
     SpeculativeCcd::new(0.0)
 )]
-pub(crate) struct Player;
+pub struct Player;
 
 #[derive(Component)]
 pub(super) struct PlayerCamera;
