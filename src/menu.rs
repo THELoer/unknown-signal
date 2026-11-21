@@ -124,33 +124,37 @@ fn setup_menu(
         .with_children(|root| {
             root.spawn((
                 Node {
-                    width: px(500),
-                    padding: UiRect::all(px(34)),
+                    width: px(560),
+                    max_width: percent(92),
+                    padding: UiRect::all(px(42)),
                     flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
+                    align_items: AlignItems::Stretch,
+                    row_gap: px(5),
+                    border: UiRect::all(px(1)),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.035, 0.052, 0.064, 0.98)),
-                BorderColor::all(Color::srgb(0.28, 0.39, 0.43)),
+                BorderRadius::all(px(8)),
+                BackgroundColor(Color::srgba(0.025, 0.040, 0.050, 0.985)),
+                BorderColor::all(Color::srgb(0.22, 0.34, 0.37)),
             ))
             .with_children(|panel| {
                 panel.spawn((
                     Text::new("UNKNOWN SIGNAL"),
                     TextFont {
-                        font_size: FontSize::Px(42.0),
+                        font_size: FontSize::Px(46.0),
                         ..default()
                     },
-                    TextColor(Color::srgb(0.78, 0.86, 0.88)),
+                    TextColor(Color::srgb(0.88, 0.93, 0.91)),
                 ));
                 panel.spawn((
-                    Text::new("CO-OP SURVIVAL // NETWORK TEST"),
+                    Text::new("CO-OP SURVIVAL  /  DEEP SPACE DIVISION"),
                     TextFont {
-                        font_size: FontSize::Px(13.0),
+                        font_size: FontSize::Px(11.0),
                         ..default()
                     },
-                    TextColor(Color::srgb(0.82, 0.55, 0.24)),
+                    TextColor(Color::srgb(0.87, 0.55, 0.29)),
                     Node {
-                        margin: UiRect::bottom(px(26)),
+                        margin: UiRect::bottom(px(30)),
                         ..default()
                     },
                 ));
@@ -201,12 +205,15 @@ fn setup_menu(
                         Node {
                             width: percent(100),
                             height: px(58),
+                            border: UiRect::all(px(1)),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
                             margin: UiRect::vertical(px(6)),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.16, 0.25, 0.27)),
+                        BorderRadius::all(px(4)),
+                        BorderColor::all(Color::srgb(0.32, 0.48, 0.47)),
+                        BackgroundColor(Color::srgb(0.10, 0.25, 0.24)),
                     ))
                     .with_children(|button| {
                         button.spawn((
@@ -232,7 +239,9 @@ fn setup_menu(
                             margin: UiRect::vertical(px(6)),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.20, 0.22, 0.24)),
+                        BorderRadius::all(px(4)),
+                        BorderColor::all(Color::srgb(0.28, 0.37, 0.39)),
+                        BackgroundColor(Color::srgb(0.10, 0.15, 0.17)),
                     ))
                     .with_children(|button| {
                         button.spawn((
@@ -253,13 +262,16 @@ fn setup_menu(
                         MenuAction::OpenSettings,
                         Node {
                             width: percent(100),
-                            height: px(48),
+                            height: px(46),
+                            border: UiRect::all(px(1)),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
                             margin: UiRect::vertical(px(6)),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.13, 0.18, 0.20)),
+                        BorderRadius::all(px(4)),
+                        BorderColor::all(Color::srgb(0.24, 0.34, 0.36)),
+                        BackgroundColor(Color::srgb(0.07, 0.11, 0.13)),
                     ))
                     .with_children(|button| {
                         button.spawn((
@@ -462,19 +474,22 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
     )).with_children(|overlay| {
         overlay.spawn((
             Node {
-                width: px(620),
+                width: px(680),
+                max_width: percent(94),
                 max_height: percent(94),
-                padding: UiRect::all(px(26)),
+                overflow: Overflow::scroll_y(),
+                padding: UiRect::all(px(32)),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Stretch,
                 row_gap: px(7),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.035, 0.052, 0.064)),
-            BorderColor::all(Color::srgb(0.28, 0.39, 0.43)),
+            BorderRadius::all(px(8)),
+            BackgroundColor(Color::srgb(0.025, 0.040, 0.050)),
+            BorderColor::all(Color::srgb(0.22, 0.34, 0.37)),
         )).with_children(|panel| {
             panel.spawn((
-                Text::new("SETTINGS"),
+                Text::new("SYSTEM SETTINGS"),
                 TextFont { font_size: FontSize::Px(30.0), ..default() },
                 TextColor(Color::srgb(0.82, 0.89, 0.90)),
             ));
@@ -634,13 +649,16 @@ fn spawn_action_button(parent: &mut ChildSpawnerCommands, label: &str, action: M
         Node {
             min_width: px(42),
             min_height: px(34),
+            border: UiRect::all(px(1)),
             padding: UiRect::axes(px(10), px(5)),
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
             margin: UiRect::vertical(px(2)),
             ..default()
         },
-        BackgroundColor(Color::srgb(0.14, 0.21, 0.23)),
+        BorderRadius::all(px(4)),
+        BorderColor::all(Color::srgb(0.24, 0.37, 0.39)),
+        BackgroundColor(Color::srgb(0.10, 0.17, 0.19)),
     )).with_children(|button| {
         button.spawn((
             Text::new(label.to_string()),
@@ -669,7 +687,9 @@ fn spawn_binding_button(
             margin: UiRect::vertical(px(1)),
             ..default()
         },
-        BackgroundColor(Color::srgb(0.09, 0.13, 0.15)),
+        BorderRadius::all(px(3)),
+        BorderColor::all(Color::srgb(0.16, 0.25, 0.27)),
+        BackgroundColor(Color::srgb(0.055, 0.09, 0.105)),
     )).with_children(|button| {
         button.spawn((
             Text::new(label.to_string()),
