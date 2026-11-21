@@ -3,10 +3,11 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use lightyear::connection::server::Start;
-use lightyear::prelude::client::{ClientPlugins, Connect, RawClient};
+use lightyear::prelude::client::{ClientPlugins, Connect, RawClient, Remote};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::prelude::{
-    Client, Connected, Link, LocalAddr, PeerAddr, ReplicationReceiver, ReplicationSender, UdpIo,
+    AppComponentExt, Client, Connected, Link, LocalAddr, NetworkTarget, PeerAddr, Replicate,
+    ReplicationReceiver, ReplicationSender, UdpIo,
 };
 
 const SERVER_PORT: u16 = 5000;
@@ -57,7 +58,9 @@ impl Plugin for NetworkingPlugin {
             .add_plugins(ServerPlugins { tick_duration })
             .init_resource::<PendingNetworkRequest>()
             .init_resource::<NetworkStatus>()
-            .add_systems(Update, (start_requested_session, monitor_connection))
+            .component::<Transform>()
+            .replicate()
+            .add_systems(Update, (start_requested_session, monitor_connection, spawn_remote_player_visuals))
             .add_observer(add_replication_sender);
     }
 }
@@ -121,12 +124,16 @@ fn add_replication_sender(
     trigger: On<Add<Connected>>,
     mut commands: Commands,
     server_links: Query<(), With<LinkOf>>,
+    players: Query<Entity, With<crate::player::Player>>,
 ) {
     // Host mode also has a local client endpoint. Only server-side peer links
     // should receive a replication sender.
     if server_links.get(trigger.entity).is_ok() {
         commands.entity(trigger.entity).insert(ReplicationSender);
-        info!("A remote client connected; replication sender enabled");
+        for player in &players {
+            commands.entity(player).insert(Replicate::to_clients(NetworkTarget::All));
+        }
+        info!("A remote client connected; player transform replication enabled");
     }
 }
 
@@ -145,4 +152,33 @@ fn monitor_connection(
         None => "Connected.".to_string(),
     };
     info!("{}", status.message);
+}
+
+
+#[derive(Component)]
+struct RemotePlayerVisual;
+
+fn spawn_remote_player_visuals(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    remote_players: Query<(Entity, &Transform), (With<Remote>, Without<RemotePlayerVisual>)>,
+) {
+    if remote_players.is_empty() { return; }
+    let mesh = meshes.add(Capsule3d::new(0.28, 1.0));
+    let material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.22, 0.48, 0.52),
+        metallic: 0.18,
+        perceptual_roughness: 0.82,
+        ..default()
+    });
+    for (entity, _) in &remote_players {
+        commands.entity(entity).insert(RemotePlayerVisual).with_child((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material.clone()),
+            Transform::default(),
+            Name::new("Remote Player Avatar"),
+        ));
+        info!("Spawned visual for replicated remote player {entity:?}");
+    }
 }
