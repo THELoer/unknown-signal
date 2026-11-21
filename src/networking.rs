@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use lightyear::connection::server::Start;
-use lightyear::prelude::client::{ClientPlugins, Connect, RawClient, UdpIo};
+use lightyear::prelude::client::{ClientPlugins, Connect, RawClient};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::prelude::{
-    Client, Connected, Link, LocalAddr, PeerAddr, ReplicationReceiver, ReplicationSender,
+    Client, Connected, Link, LocalAddr, PeerAddr, ReplicationReceiver, ReplicationSender, UdpIo,
 };
 
 const SERVER_PORT: u16 = 5000;
@@ -84,7 +84,11 @@ fn start_requested_session(
 
             let local_client_addr =
                 SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), HOST_CLIENT_PORT);
-            spawn_client(&mut commands, local_client_addr, SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), SERVER_PORT));
+            spawn_client(
+                &mut commands,
+                local_client_addr,
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), SERVER_PORT),
+            );
 
             status.mode = Some(NetworkMode::Host);
             status.message = format!("Starting host on 0.0.0.0:{SERVER_PORT}...");
@@ -100,11 +104,7 @@ fn start_requested_session(
     }
 }
 
-fn spawn_client(
-    commands: &mut Commands,
-    local_addr: SocketAddr,
-    server_addr: SocketAddr,
-) {
+fn spawn_client(commands: &mut Commands, local_addr: SocketAddr, server_addr: SocketAddr) {
     let mut client = commands.spawn((
         Client,
         LocalAddr(local_addr),
