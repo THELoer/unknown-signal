@@ -336,7 +336,7 @@ fn spawn_floor(
 
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(8.0, 0.1, 8.0),
+        Collider::cuboid(16.0, 0.2, 16.0),
         Transform::from_xyz(0.0, -0.1, 0.0),
     ));
 }
