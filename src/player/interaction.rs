@@ -220,8 +220,7 @@ fn interact_with_door(
                 PICKUP_ITEM_HALF_EXTENT,
             ),
             LinearVelocity::default(),
-            Transform::from_translation(drop_position)
-                .with_rotation(camera_transform.rotation),
+            Transform::from_translation(drop_position).with_rotation(camera_transform.rotation),
         ));
         info!("Dropped item");
         return;
@@ -240,7 +239,8 @@ fn interact_with_door(
 
     // Pickup targets take priority over doors when the ray hits an item.
     if items.get(hit.entity).is_ok() {
-        commands.entity(hit.entity)
+        commands
+            .entity(hit.entity)
             .remove::<RigidBody>()
             .remove::<Collider>()
             .remove::<LinearVelocity>()
