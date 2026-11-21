@@ -23,8 +23,13 @@ impl Plugin for PlayerPlugin {
             .add_systems(Startup, (spawn_player, lock_cursor))
             .add_systems(
                 PreUpdate,
-                (handle_cursor, capture_player_input, update_camera_look, toggle_flashlight)
-                    .chain()
+                (
+                    handle_cursor,
+                    capture_player_input,
+                    update_camera_look,
+                    toggle_flashlight,
+                )
+                .chain()
                     .after(InputSystems),
             )
             .add_systems(FixedUpdate, move_player);
@@ -224,12 +229,15 @@ fn move_player(
         // Resize the capsule while keeping the player's feet at the same height.
         if player_input.crouch && !stance.crouched {
             transform.translation.y -= STANCE_HEIGHT_DELTA;
-            commands.entity(entity).insert(Collider::capsule(PLAYER_RADIUS, CROUCHED_CAPSULE_LENGTH));
+            commands
+                .entity(entity)
+                .insert(Collider::capsule(PLAYER_RADIUS, CROUCHED_CAPSULE_LENGTH));
             stance.crouched = true;
         } else if !player_input.crouch && stance.crouched {
             let crouched_half_height = PLAYER_RADIUS + CROUCHED_CAPSULE_LENGTH * 0.5;
             let head_origin = transform.translation + Vec3::Y * (crouched_half_height - 0.02);
-            let blocked = move_and_slide.spatial_query
+            let blocked = move_and_slide
+                .spatial_query
                 .cast_ray(
                     head_origin,
                     Dir3::Y,
@@ -241,14 +249,20 @@ fn move_player(
 
             if !blocked {
                 transform.translation.y += STANCE_HEIGHT_DELTA;
-                commands.entity(entity).insert(Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH));
+                commands
+                    .entity(entity)
+                    .insert(Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH));
                 stance.crouched = false;
             }
         }
 
         let collider = Collider::capsule(
             PLAYER_RADIUS,
-            if stance.crouched { CROUCHED_CAPSULE_LENGTH } else { STANDING_CAPSULE_LENGTH },
+            if stance.crouched {
+                CROUCHED_CAPSULE_LENGTH
+            } else {
+                STANDING_CAPSULE_LENGTH
+            },
         );
 
         let half_height = PLAYER_RADIUS
@@ -261,7 +275,8 @@ fn move_player(
         // Probe just below the capsule's feet so a jump is only possible while grounded.
         let foot_origin = transform.translation - Vec3::Y * (half_height - 0.08);
         let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-        let grounded = move_and_slide.spatial_query
+        let grounded = move_and_slide
+            .spatial_query
             .cast_ray(foot_origin, Dir3::NEG_Y, 0.16, true, &filter)
             .is_some();
 
