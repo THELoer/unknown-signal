@@ -15,12 +15,7 @@ struct WorldScenePlugin;
 
 impl Plugin for WorldScenePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(AmbientLight {
-            color: Color::srgb(0.42, 0.50, 0.66),
-            brightness: 22.0,
-            ..default()
-        })
-        .add_systems(Startup, spawn_test_scene);
+        app.add_systems(Startup, spawn_test_scene);
     }
 }
 
