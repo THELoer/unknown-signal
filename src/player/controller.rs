@@ -217,11 +217,11 @@ fn update_stamina_hud(stamina: Res<PlayerStamina>, mut labels: Query<&mut Text, 
 }
 
 #[derive(Resource, Default)]
-struct PlayerInput {
-    movement: Vec2,
-    sprint: bool,
-    crouch: bool,
-    jump_pressed: bool,
+pub(crate) struct PlayerInput {
+    pub(crate) movement: Vec2,
+    pub(crate) sprint: bool,
+    pub(crate) crouch: bool,
+    pub(crate) jump_pressed: bool,
 }
 
 fn spawn_player(mut commands: Commands) {

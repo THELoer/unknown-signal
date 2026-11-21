@@ -1,6 +1,6 @@
 mod controller;
 
-pub(crate) use controller::Player;
+pub(crate) use controller::{Player, PlayerInput};
 pub use controller::{ControlAction, GameplayActive, PlayerPlugin, PlayerSettings};
 mod interaction;
 

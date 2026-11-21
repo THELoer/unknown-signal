@@ -4,12 +4,16 @@ use std::time::Duration;
 use bevy::prelude::*;
 use lightyear::connection::host::HostClient;
 use lightyear::connection::server::Start;
-use lightyear::prelude::client::{ClientPlugins, Connect, RawClient, Remote};
+use lightyear::prelude::client::{ClientPlugins, Connect, RawClient};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::prelude::{
-    AppComponentExt, Client, Connected, Link, LocalAddr, NetworkTarget, PeerAddr, Replicate,
-    ReplicationReceiver, ReplicationSender, UdpIo,
+    AppComponentExt, Client, Connected, Interpolated, InterpolationTarget, Link, LocalAddr,
+    NetworkTarget, PeerAddr, Replicate, ReplicationReceiver, ReplicationSender, UdpIo,
 };
+
+mod diagnostics;
+mod players;
+mod protocol;
 
 const SERVER_PORT: u16 = 5000;
 const TICK_RATE: f64 = 64.0;
@@ -92,11 +96,14 @@ impl Plugin for NetworkingPlugin {
         app.insert_resource(config)
             .add_plugins(ClientPlugins { tick_duration })
             .add_plugins(ServerPlugins { tick_duration })
+            .add_plugins(protocol::NetworkProtocolPlugin)
+            .add_plugins(players::NetworkPlayersPlugin)
+            .add_plugins(diagnostics::NetworkDiagnosticsHudPlugin)
             .init_resource::<PendingNetworkRequest>()
             .init_resource::<NetworkStatus>()
             .init_resource::<NetworkDiagnostics>()
-            // Transform is the first replicated gameplay component. Add other
-            // components only after their authority and serialization are defined.
+            // Transform is the first replicated gameplay component. The
+            // server owns it; clients render Interpolated copies.
             .component::<Transform>()
             .replicate();
 
@@ -106,7 +113,6 @@ impl Plugin for NetworkingPlugin {
                 start_requested_session,
                 monitor_connection,
                 update_network_diagnostics,
-                spawn_remote_player_visuals,
             )
                 .chain(),
         )
@@ -190,7 +196,7 @@ fn spawn_client(
 }
 
 /// A server-side remote link needs a sender; the local HostClient does not.
-/// Existing players are opted into replication when the first peer connects.
+/// Existing local host players are sent with interpolation to every peer.
 fn add_replication_sender(
     trigger: On<Add<Connected>>,
     mut commands: Commands,
@@ -201,12 +207,13 @@ fn add_replication_sender(
     if server_links.get(trigger.entity).is_ok() && host_clients.get(trigger.entity).is_err() {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
-            commands
-                .entity(player)
-                .insert(Replicate::to_clients(NetworkTarget::All));
+            commands.entity(player).insert((
+                Replicate::to_clients(NetworkTarget::All),
+                InterpolationTarget::to_clients(NetworkTarget::All),
+            ));
         }
         info!(
-            "Remote peer {:?} connected; enabled player Transform replication",
+            "Remote peer {:?} connected; host player replication enabled",
             trigger.entity
         );
     }
@@ -243,61 +250,17 @@ fn monitor_connection(
     }
 
     if matches!(status.mode, Some(NetworkMode::Host)) && status.connected {
-        status.message = format!(
-            "Host online · {} remote peer(s)",
-            status.peer_count
-        );
+        status.message = format!("Host online · {} remote peer(s)", status.peer_count);
     }
 }
 
 fn update_network_diagnostics(
     clients: Query<(), (With<Client>, With<Connected>)>,
     server_peers: Query<(), (With<LinkOf>, With<Connected>, Without<HostClient>)>,
-    remote_players: Query<(), (With<Remote>, With<RemotePlayerVisual>)>,
+    remote_players: Query<(), With<Interpolated>>,
     mut diagnostics: ResMut<NetworkDiagnostics>,
 ) {
     diagnostics.connected_clients = clients.iter().count();
     diagnostics.connected_server_peers = server_peers.iter().count();
     diagnostics.remote_player_avatars = remote_players.iter().count();
-}
-
-#[derive(Component)]
-struct RemotePlayerVisual;
-
-/// The visual is a child of the replicated entity, so it follows the replicated
-/// Transform without creating a second transform-sync path.
-fn spawn_remote_player_visuals(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    remote_players: Query<Entity, (With<Remote>, Without<RemotePlayerVisual>)>,
-) {
-    if remote_players.is_empty() {
-        return;
-    }
-
-    let mesh = meshes.add(Capsule3d::new(0.28, 1.0));
-    let material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.22, 0.48, 0.52),
-        metallic: 0.18,
-        perceptual_roughness: 0.82,
-        ..default()
-    });
-
-    for entity in &remote_players {
-        commands
-            .entity(entity)
-            .insert((
-                RemotePlayerVisual,
-                Visibility::default(),
-                InheritedVisibility::default(),
-            ))
-            .with_child((
-                Mesh3d(mesh.clone()),
-                MeshMaterial3d(material.clone()),
-                Transform::default(),
-                Name::new("Remote Player Avatar"),
-            ));
-        info!("Spawned visual for replicated remote entity {entity:?}");
-    }
 }
