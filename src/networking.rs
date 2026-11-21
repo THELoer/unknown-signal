@@ -2,10 +2,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use bevy::prelude::*;
+use lightyear::connection::host::HostClient;
 use lightyear::connection::server::Start;
 use lightyear::prelude::client::{ClientPlugins, Connect, RawClient, Remote};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
-use lightyear::connection::host::HostClient;
 use lightyear::prelude::{
     AppComponentExt, Client, Connected, Link, LocalAddr, NetworkTarget, PeerAddr, Replicate,
     ReplicationReceiver, ReplicationSender, UdpIo,
@@ -13,6 +13,23 @@ use lightyear::prelude::{
 
 const SERVER_PORT: u16 = 5000;
 const TICK_RATE: f64 = 64.0;
+
+/// The server currently owns the session simulation. Keep this value aligned
+/// with the fixed simulation rate used by the gameplay systems.
+#[derive(Resource, Clone, Copy, Debug)]
+pub struct NetworkConfig {
+    pub bind_addr: SocketAddr,
+    pub tick_rate: f64,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            bind_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), SERVER_PORT),
+            tick_rate: TICK_RATE,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum NetworkRequest {
@@ -23,7 +40,7 @@ pub enum NetworkRequest {
 #[derive(Resource, Default)]
 pub struct PendingNetworkRequest(pub Option<NetworkRequest>);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NetworkMode {
     Host,
     Client,
@@ -34,7 +51,12 @@ pub struct NetworkStatus {
     pub message: String,
     pub connected: bool,
     pub mode: Option<NetworkMode>,
+    /// Number of remote server-side links currently marked Connected.
+    pub peer_count: usize,
+    /// Most recent local disconnect/error summary.
+    pub last_error: Option<String>,
     requested: bool,
+    session_entities: Vec<Entity>,
 }
 
 impl Default for NetworkStatus {
@@ -43,21 +65,38 @@ impl Default for NetworkStatus {
             message: "Select Host Server or Connect Server".to_string(),
             connected: false,
             mode: None,
+            peer_count: 0,
+            last_error: None,
             requested: false,
+            session_entities: Vec::new(),
         }
     }
+}
+
+/// Small, local-only diagnostics snapshot. This deliberately contains no
+/// gameplay state and is safe to expose to the menu/debug UI.
+#[derive(Resource, Default, Debug)]
+pub struct NetworkDiagnostics {
+    pub connected_clients: usize,
+    pub connected_server_peers: usize,
+    pub remote_player_avatars: usize,
 }
 
 pub struct NetworkingPlugin;
 
 impl Plugin for NetworkingPlugin {
     fn build(&self, app: &mut App) {
-        let tick_duration = Duration::from_secs_f64(1.0 / TICK_RATE);
+        let config = NetworkConfig::default();
+        let tick_duration = Duration::from_secs_f64(1.0 / config.tick_rate);
 
-        app.add_plugins(ClientPlugins { tick_duration })
+        app.insert_resource(config)
+            .add_plugins(ClientPlugins { tick_duration })
             .add_plugins(ServerPlugins { tick_duration })
             .init_resource::<PendingNetworkRequest>()
             .init_resource::<NetworkStatus>()
+            .init_resource::<NetworkDiagnostics>()
+            // Transform is the first replicated gameplay component. Add other
+            // components only after their authority and serialization are defined.
             .component::<Transform>()
             .replicate();
 
@@ -66,50 +105,64 @@ impl Plugin for NetworkingPlugin {
             (
                 start_requested_session,
                 monitor_connection,
+                update_network_diagnostics,
                 spawn_remote_player_visuals,
-            ),
+            )
+                .chain(),
         )
         .add_observer(add_replication_sender);
     }
 }
 
+/// Replacing a session first tears down the endpoints created by the previous
+/// request. This prevents repeated menu actions from leaving stale UDP sockets
+/// and multiple client entities in the same Bevy App.
 fn start_requested_session(
     mut commands: Commands,
     mut request: ResMut<PendingNetworkRequest>,
     mut status: ResMut<NetworkStatus>,
+    config: Res<NetworkConfig>,
 ) {
     let Some(request) = request.0.take() else {
         return;
     };
 
+    for entity in status.session_entities.drain(..) {
+        commands.entity(entity).despawn();
+    }
+
     status.connected = false;
+    status.peer_count = 0;
+    status.last_error = None;
     status.requested = true;
 
     match request {
         NetworkRequest::Host => {
-            let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), SERVER_PORT);
             let server = commands
-                .spawn((RawServer, LocalAddr(server_addr), ServerUdpIo))
+                .spawn((RawServer, LocalAddr(config.bind_addr), ServerUdpIo))
                 .id();
             commands.trigger(Start { entity: server });
 
-            // Host mode uses Lightyear's in-process host-client topology.
-            // A loopback UDP client is a separate peer and does not form a host pair.
+            // Host mode is an in-process Lightyear host-client pair. A UDP
+            // loopback client is a separate peer and is not the host topology.
             let mut host_client = commands.spawn((
                 Client,
                 LinkOf { endpoint: server },
                 Link::default(),
                 ReplicationReceiver,
             ));
+            let host_client_entity = host_client.id();
             host_client.trigger(Connect::from);
 
+            status.session_entities.extend([server, host_client_entity]);
             status.mode = Some(NetworkMode::Host);
-            status.message = format!("Starting host on 0.0.0.0:{SERVER_PORT}...");
-            info!("Started host server on 0.0.0.0:{SERVER_PORT}");
+            status.message = format!("Starting host on {}...", config.bind_addr);
+            info!("Starting host server on {}", config.bind_addr);
         }
         NetworkRequest::Connect(server_addr) => {
             let local_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-            spawn_client(&mut commands, local_addr, server_addr);
+            let client = spawn_client(&mut commands, local_addr, server_addr);
+            status.session_entities.push(client);
             status.mode = Some(NetworkMode::Client);
             status.message = format!("Connecting to {server_addr}...");
             info!("Connecting to server {server_addr}");
@@ -117,7 +170,11 @@ fn start_requested_session(
     }
 }
 
-fn spawn_client(commands: &mut Commands, local_addr: SocketAddr, server_addr: SocketAddr) {
+fn spawn_client(
+    commands: &mut Commands,
+    local_addr: SocketAddr,
+    server_addr: SocketAddr,
+) -> Entity {
     let mut client = commands.spawn((
         Client,
         LocalAddr(local_addr),
@@ -127,9 +184,13 @@ fn spawn_client(commands: &mut Commands, local_addr: SocketAddr, server_addr: So
         RawClient,
         UdpIo::default(),
     ));
+    let entity = client.id();
     client.trigger(Connect::from);
+    entity
 }
 
+/// A server-side remote link needs a sender; the local HostClient does not.
+/// Existing players are opted into replication when the first peer connects.
 fn add_replication_sender(
     trigger: On<Add<Connected>>,
     mut commands: Commands,
@@ -137,50 +198,84 @@ fn add_replication_sender(
     host_clients: Query<(), With<HostClient>>,
     players: Query<Entity, With<crate::player::Player>>,
 ) {
-    // Host mode also has a local client endpoint. Only server-side peer links
-    // should receive a replication sender.
-    if server_links.get(trigger.entity).is_ok()
-        && host_clients.get(trigger.entity).is_err()
-    {
+    if server_links.get(trigger.entity).is_ok() && host_clients.get(trigger.entity).is_err() {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
             commands
                 .entity(player)
                 .insert(Replicate::to_clients(NetworkTarget::All));
         }
-        info!("A remote client connected; player transform replication enabled");
+        info!(
+            "Remote peer {:?} connected; enabled player Transform replication",
+            trigger.entity
+        );
     }
 }
 
+/// Tracks the local endpoint's actual Connected state instead of treating the
+/// existence of a Client entity as proof of a successful connection.
 fn monitor_connection(
     clients: Query<(), (With<Client>, With<Connected>)>,
+    server_peers: Query<(), (With<LinkOf>, With<Connected>, Without<HostClient>)>,
     mut status: ResMut<NetworkStatus>,
 ) {
-    if !status.requested || status.connected || clients.is_empty() {
+    if !status.requested {
         return;
     }
 
-    status.connected = true;
-    status.message = match status.mode {
-        Some(NetworkMode::Host) => "Host session ready. Waiting for other players.".to_string(),
-        Some(NetworkMode::Client) => "Connected to host. Joining session...".to_string(),
-        None => "Connected.".to_string(),
-    };
-    info!("{}", status.message);
+    let local_connected = !clients.is_empty();
+    let peer_count = server_peers.iter().count();
+    status.peer_count = peer_count;
+
+    if local_connected && !status.connected {
+        status.connected = true;
+        status.message = match status.mode {
+            Some(NetworkMode::Host) => "Host session ready. Waiting for other players.".to_string(),
+            Some(NetworkMode::Client) => "Connected to host. Joining session...".to_string(),
+            None => "Connected.".to_string(),
+        };
+        info!("{}", status.message);
+    } else if !local_connected && status.connected {
+        status.connected = false;
+        status.message = "Connection lost. Return to the menu and reconnect.".to_string();
+        status.last_error = Some("The active client endpoint is no longer connected".to_string());
+        warn!("{}", status.message);
+    }
+
+    if matches!(status.mode, Some(NetworkMode::Host)) && status.connected {
+        status.message = format!(
+            "Host online · {} remote peer(s)",
+            status.peer_count
+        );
+    }
+}
+
+fn update_network_diagnostics(
+    clients: Query<(), (With<Client>, With<Connected>)>,
+    server_peers: Query<(), (With<LinkOf>, With<Connected>, Without<HostClient>)>,
+    remote_players: Query<(), (With<Remote>, With<RemotePlayerVisual>)>,
+    mut diagnostics: ResMut<NetworkDiagnostics>,
+) {
+    diagnostics.connected_clients = clients.iter().count();
+    diagnostics.connected_server_peers = server_peers.iter().count();
+    diagnostics.remote_player_avatars = remote_players.iter().count();
 }
 
 #[derive(Component)]
 struct RemotePlayerVisual;
 
+/// The visual is a child of the replicated entity, so it follows the replicated
+/// Transform without creating a second transform-sync path.
 fn spawn_remote_player_visuals(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    remote_players: Query<(Entity, &Transform), (With<Remote>, Without<RemotePlayerVisual>)>,
+    remote_players: Query<Entity, (With<Remote>, Without<RemotePlayerVisual>)>,
 ) {
     if remote_players.is_empty() {
         return;
     }
+
     let mesh = meshes.add(Capsule3d::new(0.28, 1.0));
     let material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.22, 0.48, 0.52),
@@ -188,7 +283,8 @@ fn spawn_remote_player_visuals(
         perceptual_roughness: 0.82,
         ..default()
     });
-    for (entity, _) in &remote_players {
+
+    for entity in &remote_players {
         commands
             .entity(entity)
             .insert((
@@ -202,6 +298,6 @@ fn spawn_remote_player_visuals(
                 Transform::default(),
                 Name::new("Remote Player Avatar"),
             ));
-        info!("Spawned visual for replicated remote player {entity:?}");
+        info!("Spawned visual for replicated remote entity {entity:?}");
     }
 }

@@ -181,7 +181,10 @@ struct PlayerStamina {
 
 impl Default for PlayerStamina {
     fn default() -> Self {
-        Self { current: STAMINA_MAX, regen_cooldown: 0.0 }
+        Self {
+            current: STAMINA_MAX,
+            regen_cooldown: 0.0,
+        }
     }
 }
 
@@ -192,9 +195,17 @@ fn spawn_stamina_hud(mut commands: Commands) {
     commands.spawn((
         StaminaHud,
         Text::new("STAMINA  100%"),
-        TextFont { font_size: FontSize::Px(14.0), ..default() },
+        TextFont {
+            font_size: FontSize::Px(14.0),
+            ..default()
+        },
         TextColor(Color::srgb(0.68, 0.84, 0.78)),
-        Node { position_type: PositionType::Absolute, left: px(24), top: px(24), ..default() },
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(24),
+            top: px(24),
+            ..default()
+        },
     ));
 }
 
