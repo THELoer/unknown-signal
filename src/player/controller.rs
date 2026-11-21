@@ -88,6 +88,7 @@ fn spawn_player(mut commands: Commands) {
             Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH),
             LinearVelocity::default(),
             TransformInterpolation,
+            Visibility::default(),
             Transform::from_xyz(0.0, 1.0, 5.0),
         ))
         .with_child((
@@ -147,8 +148,11 @@ fn handle_cursor(
 fn update_camera_look(
     mouse_motion: Res<AccumulatedMouseMotion>,
     windows: Query<&CursorOptions, With<PrimaryWindow>>,
-    mut players: Query<&mut Transform, With<Player>>,
-    mut cameras: Query<(&mut Transform, &mut CameraPitch), With<PlayerCamera>>,
+    mut players: Query<&mut Transform, (With<Player>, Without<PlayerCamera>)>,
+    mut cameras: Query<
+        (&mut Transform, &mut CameraPitch),
+        (With<PlayerCamera>, Without<Player>),
+    >,
 ) {
     let cursor_locked = windows
         .iter()
@@ -172,13 +176,13 @@ fn update_camera_look(
 }
 
 fn move_player(
+    mut commands: Commands,
     time: Res<Time>,
     mut player_input: ResMut<PlayerInput>,
     mut players: Query<(
         Entity,
         &mut Transform,
         &mut LinearVelocity,
-        &mut Collider,
         &mut PlayerStance,
         &PlayerMovementSettings,
     ), With<Player>>,
@@ -187,13 +191,16 @@ fn move_player(
 ) {
     let delta = time.delta_secs();
 
-    for (entity, mut transform, mut velocity, mut collider, mut stance, settings) in
+    for (entity, mut transform, mut velocity, mut stance, settings) in
         &mut players
     {
         // Resize the capsule while keeping the player's feet at the same height.
         if player_input.crouch && !stance.crouched {
             transform.translation.y -= STANCE_HEIGHT_DELTA;
-            *collider = Collider::capsule(PLAYER_RADIUS, CROUCHED_CAPSULE_LENGTH);
+            commands.entity(entity).insert(Collider::capsule(
+                PLAYER_RADIUS,
+                CROUCHED_CAPSULE_LENGTH,
+            ));
             stance.crouched = true;
         } else if !player_input.crouch && stance.crouched {
             let crouched_half_height = PLAYER_RADIUS + CROUCHED_CAPSULE_LENGTH * 0.5;
@@ -211,10 +218,22 @@ fn move_player(
 
             if !blocked {
                 transform.translation.y += STANCE_HEIGHT_DELTA;
-                *collider = Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH);
+                commands.entity(entity).insert(Collider::capsule(
+                    PLAYER_RADIUS,
+                    STANDING_CAPSULE_LENGTH,
+                ));
                 stance.crouched = false;
             }
         }
+
+        let collider = Collider::capsule(
+            PLAYER_RADIUS,
+            if stance.crouched {
+                CROUCHED_CAPSULE_LENGTH
+            } else {
+                STANDING_CAPSULE_LENGTH
+            },
+        );
 
         let half_height = PLAYER_RADIUS
             + if stance.crouched {
