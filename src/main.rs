@@ -91,6 +91,7 @@ fn spawn_test_scene(
         base_color: Color::srgb(0.40, 0.52, 0.62),
         metallic: 0.12,
         perceptual_roughness: 0.34,
+        emissive: Color::srgb(0.18, 0.25, 0.34).into(),
         ..default()
     });
 
@@ -285,8 +286,8 @@ fn spawn_test_scene(
         commands.spawn((
             PointLight {
                 color,
-                intensity: 7_500.0,
-                range: 16.0,
+                intensity: 18_000.0,
+                range: 22.0,
                 radius: 0.18,
                 shadow_maps_enabled: false,
                 ..default()
