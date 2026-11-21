@@ -59,7 +59,7 @@ fn interact_with_door(
     keyboard: Res<ButtonInput<KeyCode>>,
     players: Query<(Entity, &Transform), With<Player>>,
     cameras: Query<&CameraPitch, With<PlayerCamera>>,
-    mut doors: Query<(&mut Transform, &mut Door)>,
+    mut doors: Query<(&mut Transform, &mut Door), Without<Player>>,
     spatial_query: SpatialQuery,
 ) {
     if !keyboard.just_pressed(KeyCode::KeyE) {
