@@ -31,7 +31,31 @@ fn spawn_test_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
+    // Imported Blender test assets: a metallic GLB and a cube using the
+    // texture embedded in the supplied salo.glb sample.
+    let iron_cube_scene: Handle<Scene> = asset_server.load("models/cube.glb#Scene0");
+    commands.spawn((
+        SceneRoot(iron_cube_scene),
+        Name::new("GLB Test - Iron Cube"),
+        Transform::from_xyz(-1.25, -0.4347, 3.25).with_scale(Vec3::splat(0.5)),
+    ));
+
+    let salo_texture: Handle<Image> = asset_server.load("textures/salo_test.png");
+    let salo_material = materials.add(StandardMaterial {
+        base_color_texture: Some(salo_texture),
+        metallic: 0.0,
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    commands.spawn((
+        Mesh3d(cube.clone()),
+        MeshMaterial3d(salo_material),
+        Name::new("Texture Test - Salo"),
+        Transform::from_xyz(1.25, 0.5, 3.25),
+    ));
+
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
 
     let floor = materials.add(StandardMaterial {
