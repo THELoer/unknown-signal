@@ -64,7 +64,21 @@ impl Plugin for NetworkPlayersPlugin {
 fn add_input_marker_to_controlled_player(
     trigger: On<Add<Controlled>>,
     mut commands: Commands,
+    authoritative_players: Query<&Transform, (With<Controlled>, Without<Player>)>,
+    mut local_players: Query<&mut Transform, With<Player>>,
 ) {
+    // The local first-person rig is spawned before the network handshake. Once
+    // the server-controlled entity arrives, align that rig with its assigned
+    // authoritative spawn transform so the owner does not appear at a second,
+    // unrelated location in the level.
+    if let (Ok(authoritative), Ok(mut local)) = (
+        authoritative_players.get(trigger.entity),
+        local_players.single_mut(),
+    ) {
+        local.translation = authoritative.translation;
+        local.rotation = authoritative.rotation;
+    }
+
     commands
         .entity(trigger.entity)
         .insert(InputMarker::<NetworkPlayerInput>::default());
@@ -148,7 +162,6 @@ fn spawn_player_for_connected_peer(
             // Server owns the Transform. Every connected peer receives a
             // Remote copy; ControlledBy grants input ownership only to this peer.
             Replicate::to_clients(NetworkTarget::All),
-            InterpolationTarget::to_clients(NetworkTarget::All),
             ControlledBy {
                 owner: trigger.entity,
                 lifetime: Default::default(),
@@ -229,12 +242,16 @@ fn movement_speed(input: &NetworkPlayerInput) -> f32 {
 
 /// Lightyear's Remote marker is present on the received server entity. This
 /// matches the existing host-avatar path and gives remote client players the
-/// same visual representation.
+/// same visual representation. The owning client is excluded because its
+/// first-person controller already occupies that authoritative position.
 fn spawn_remote_player_visuals(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    remote_players: Query<Entity, (With<Remote>, Without<NetworkPlayerVisual>)>,
+    remote_players: Query<
+        Entity,
+        (With<Remote>, Without<Controlled>, Without<NetworkPlayerVisual>),
+    >,
 ) {
     if remote_players.is_empty() {
         return;
