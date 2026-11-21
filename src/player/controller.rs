@@ -12,11 +12,86 @@ const STANDING_CAPSULE_LENGTH: f32 = 1.1;
 const CROUCHED_CAPSULE_LENGTH: f32 = 0.45;
 const STANCE_HEIGHT_DELTA: f32 = (STANDING_CAPSULE_LENGTH - CROUCHED_CAPSULE_LENGTH) * 0.5;
 pub(super) const EYE_HEIGHT: f32 = 0.55;
-const MOUSE_SENSITIVITY: f32 = 0.0030;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.05;
 
 #[derive(Resource, Default)]
 pub struct GameplayActive(pub bool);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ControlAction {
+    MoveForward,
+    MoveBackward,
+    MoveLeft,
+    MoveRight,
+    Sprint,
+    Crouch,
+    Jump,
+    Interact,
+    Flashlight,
+}
+
+#[derive(Resource)]
+pub struct PlayerSettings {
+    pub mouse_sensitivity: f32,
+    pub invert_mouse_y: bool,
+    pub move_forward: KeyCode,
+    pub move_backward: KeyCode,
+    pub move_left: KeyCode,
+    pub move_right: KeyCode,
+    pub sprint: KeyCode,
+    pub crouch: KeyCode,
+    pub jump: KeyCode,
+    pub interact: KeyCode,
+    pub flashlight: KeyCode,
+}
+
+impl Default for PlayerSettings {
+    fn default() -> Self {
+        Self {
+            mouse_sensitivity: 0.003,
+            invert_mouse_y: false,
+            move_forward: KeyCode::KeyW,
+            move_backward: KeyCode::KeyS,
+            move_left: KeyCode::KeyA,
+            move_right: KeyCode::KeyD,
+            sprint: KeyCode::ShiftLeft,
+            crouch: KeyCode::ControlLeft,
+            jump: KeyCode::Space,
+            interact: KeyCode::KeyE,
+            flashlight: KeyCode::KeyF,
+        }
+    }
+}
+
+impl PlayerSettings {
+    pub fn binding(&self, action: ControlAction) -> KeyCode {
+        match action {
+            ControlAction::MoveForward => self.move_forward,
+            ControlAction::MoveBackward => self.move_backward,
+            ControlAction::MoveLeft => self.move_left,
+            ControlAction::MoveRight => self.move_right,
+            ControlAction::Sprint => self.sprint,
+            ControlAction::Crouch => self.crouch,
+            ControlAction::Jump => self.jump,
+            ControlAction::Interact => self.interact,
+            ControlAction::Flashlight => self.flashlight,
+        }
+    }
+
+    pub fn set_binding(&mut self, action: ControlAction, key: KeyCode) {
+        match action {
+            ControlAction::MoveForward => self.move_forward = key,
+            ControlAction::MoveBackward => self.move_backward = key,
+            ControlAction::MoveLeft => self.move_left = key,
+            ControlAction::MoveRight => self.move_right = key,
+            ControlAction::Sprint => self.sprint = key,
+            ControlAction::Crouch => self.crouch = key,
+            ControlAction::Jump => self.jump = key,
+            ControlAction::Interact => self.interact = key,
+            ControlAction::Flashlight => self.flashlight = key,
+        }
+    }
+}
 
 pub struct PlayerPlugin;
 
@@ -24,6 +99,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>()
             .init_resource::<GameplayActive>()
+            .init_resource::<PlayerSettings>()
             .add_systems(Startup, spawn_player)
             .add_systems(
                 PreUpdate,
@@ -145,6 +221,7 @@ fn spawn_player(mut commands: Commands) {
 
 fn capture_player_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    settings: Res<PlayerSettings>,
     active: Res<GameplayActive>,
     mut player_input: ResMut<PlayerInput>,
 ) {
@@ -154,17 +231,14 @@ fn capture_player_input(
     }
 
     let horizontal =
-        (keyboard.pressed(KeyCode::KeyD) as i8) - (keyboard.pressed(KeyCode::KeyA) as i8);
+        (keyboard.pressed(settings.move_right) as i8) - (keyboard.pressed(settings.move_left) as i8);
     let vertical =
-        (keyboard.pressed(KeyCode::KeyW) as i8) - (keyboard.pressed(KeyCode::KeyS) as i8);
+        (keyboard.pressed(settings.move_forward) as i8) - (keyboard.pressed(settings.move_backward) as i8);
 
     player_input.movement = Vec2::new(horizontal as f32, vertical as f32).clamp_length_max(1.0);
-    player_input.sprint =
-        keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
-    player_input.crouch = keyboard.pressed(KeyCode::ControlLeft)
-        || keyboard.pressed(KeyCode::ControlRight)
-        || keyboard.pressed(KeyCode::KeyC);
-    player_input.jump_pressed = keyboard.just_pressed(KeyCode::Space);
+    player_input.sprint = keyboard.pressed(settings.sprint);
+    player_input.crouch = keyboard.pressed(settings.crouch);
+    player_input.jump_pressed = keyboard.just_pressed(settings.jump);
 }
 
 fn handle_cursor(
@@ -183,6 +257,7 @@ fn handle_cursor(
 }
 
 fn update_camera_look(
+    settings: Res<PlayerSettings>,
     mouse_motion: Res<AccumulatedMouseMotion>,
     windows: Query<&CursorOptions, With<PrimaryWindow>>,
     active: Res<GameplayActive>,
@@ -204,12 +279,14 @@ fn update_camera_look(
     let delta = mouse_motion.delta;
     for mut player_transform in &mut players {
         let (mut yaw, _, _) = player_transform.rotation.to_euler(EulerRot::YXZ);
-        yaw -= delta.x * MOUSE_SENSITIVITY;
+        yaw -= delta.x * settings.mouse_sensitivity;
         player_transform.rotation = Quat::from_rotation_y(yaw);
     }
 
     for (mut camera_transform, mut pitch) in &mut cameras {
-        pitch.0 = (pitch.0 - delta.y * MOUSE_SENSITIVITY).clamp(-MAX_PITCH, MAX_PITCH);
+        let pitch_sign = if settings.invert_mouse_y { 1.0 } else { -1.0 };
+        pitch.0 = (pitch.0 + delta.y * settings.mouse_sensitivity * pitch_sign)
+            .clamp(-MAX_PITCH, MAX_PITCH);
         camera_transform.rotation = Quat::from_rotation_x(pitch.0);
     }
 }
@@ -340,11 +417,12 @@ fn move_player(
 }
 
 fn toggle_flashlight(
+    settings: Res<PlayerSettings>,
     keyboard: Res<ButtonInput<KeyCode>>,
     active: Res<GameplayActive>,
     mut flashlights: Query<(&mut SpotLight, &mut Flashlight), With<PlayerCamera>>,
 ) {
-    if !active.0 || !keyboard.just_pressed(KeyCode::KeyF) {
+    if !active.0 || !keyboard.just_pressed(settings.flashlight) {
         return;
     }
 
