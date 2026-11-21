@@ -7,7 +7,7 @@ use lightyear::connection::server::Start;
 use lightyear::prelude::client::{ClientPlugins, Connect, RawClient};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::prelude::{
-    AppComponentExt, Client, Connected, Interpolated, InterpolationTarget, Link, LocalAddr,
+    AppComponentExt, Client, Connected, Link, LocalAddr,
     NetworkTarget, PeerAddr, Replicate, ReplicationReceiver, ReplicationSender, UdpIo,
 };
 
@@ -103,7 +103,7 @@ impl Plugin for NetworkingPlugin {
             .init_resource::<NetworkStatus>()
             .init_resource::<NetworkDiagnostics>()
             // Transform is the first replicated gameplay component. The
-            // server owns it; clients render Interpolated copies.
+            // server owns it; clients render Remote copies.
             .component::<Transform>()
             .replicate();
 
@@ -207,10 +207,7 @@ fn add_replication_sender(
     if server_links.get(trigger.entity).is_ok() && host_clients.get(trigger.entity).is_err() {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
-            commands.entity(player).insert((
-                Replicate::to_clients(NetworkTarget::All),
-                InterpolationTarget::to_clients(NetworkTarget::All),
-            ));
+            commands.entity(player).insert(Replicate::to_clients(NetworkTarget::All));
         }
         info!(
             "Remote peer {:?} connected; host player replication enabled",
@@ -257,7 +254,7 @@ fn monitor_connection(
 fn update_network_diagnostics(
     clients: Query<(), (With<Client>, With<Connected>)>,
     server_peers: Query<(), (With<LinkOf>, With<Connected>, Without<HostClient>)>,
-    remote_players: Query<(), With<Interpolated>>,
+    remote_players: Query<(), With<lightyear::prelude::client::Remote>>,
     mut diagnostics: ResMut<NetworkDiagnostics>,
 ) {
     diagnostics.connected_clients = clients.iter().count();

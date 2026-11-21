@@ -3,12 +3,10 @@
 //! A successful remote connection creates a server-owned player entity. The
 //! entity is replicated to all clients and associated with the connecting
 //! peer through ControlledBy. Lightyear then routes that peer's input timeline
-//! to the controlled entity. Clients render Interpolated copies; the local
+//! to the controlled entity. Clients render Remote copies; the local
 //! first-person controller remains local and never owns the server Transform.
 
-use avian3d::prelude::*;
 use bevy::prelude::*;
-use lightyear::connection::client::Disconnected;
 use lightyear::prelude::client::input::*;
 use lightyear::prelude::input::native::*;
 use lightyear::prelude::server::*;
@@ -32,11 +30,6 @@ const PLAYER_SPAWN_SPACING: f32 = 1.4;
 #[derive(Component)]
 pub(crate) struct NetworkPlayer;
 
-/// Records which connection owns a server-side player entity. This is used
-/// to clean up the player when that connection is disconnected or rejected.
-#[derive(Component)]
-struct NetworkPlayerOwner(Entity);
-
 /// Minimal vertical state for the first authoritative movement prototype.
 /// Horizontal motion and orientation are derived entirely from input packets.
 #[derive(Component, Default)]
@@ -44,7 +37,7 @@ struct NetworkPlayerMotion {
     vertical_velocity: f32,
 }
 
-/// Visual marker added to client-side interpolated copies after their first
+/// Visual marker added to client-side remote copies after their first
 /// frame. The mesh is a child of the replicated root and therefore inherits
 /// the server-authored position and rotation.
 #[derive(Component)]
@@ -62,8 +55,7 @@ impl Plugin for NetworkPlayersPlugin {
         .add_systems(FixedUpdate, simulate_authoritative_players)
         .add_systems(Update, spawn_interpolated_player_visuals)
         .add_observer(add_input_marker_to_controlled_player)
-        .add_observer(spawn_player_for_connected_peer)
-        .add_observer(despawn_players_for_disconnected_peer);
+        .add_observer(spawn_player_for_connected_peer);
     }
 }
 
@@ -147,15 +139,14 @@ fn spawn_player_for_connected_peer(
     let player = commands
         .spawn((
             NetworkPlayer,
-            NetworkPlayerOwner(trigger.entity),
             NetworkPlayerMotion::default(),
+            ActionState::<NetworkPlayerInput>::default(),
             Transform::from_translation(spawn_position),
             Visibility::default(),
             InheritedVisibility::default(),
             Name::new(format!("Network Player {peer_id:?}")),
-            // Server owns the Transform. Every connected peer receives an
-            // interpolated copy; the controlling peer supplies input through
-            // ControlledBy rather than writing replicated state directly.
+            // Server owns the Transform. Every connected peer receives a
+            // Remote copy; ControlledBy grants input ownership only to this peer.
             Replicate::to_clients(NetworkTarget::All),
             InterpolationTarget::to_clients(NetworkTarget::All),
             ControlledBy {
@@ -169,30 +160,6 @@ fn spawn_player_for_connected_peer(
         "Spawned authoritative player {:?} for peer {:?} at {:?}",
         player, peer_id, spawn_position
     );
-}
-
-/// Remove only the player owned by the disconnected link. Other clients and
-/// their player entities remain alive; the server session itself stays up.
-fn despawn_players_for_disconnected_peer(
-    trigger: On<Add<Disconnected>>,
-    mut commands: Commands,
-    players: Query<(Entity, &NetworkPlayerOwner)>,
-) {
-    let mut removed = 0usize;
-
-    for (entity, owner) in &players {
-        if owner.0 == trigger.entity {
-            commands.entity(entity).despawn();
-            removed += 1;
-        }
-    }
-
-    if removed > 0 {
-        info!(
-            "Removed {removed} network player(s) for disconnected link {:?}",
-            trigger.entity
-        );
-    }
 }
 
 /// Apply input on the server at the same fixed rate used by Lightyear.
@@ -260,17 +227,16 @@ fn movement_speed(input: &NetworkPlayerInput) -> f32 {
     }
 }
 
-/// Replicated entities intended for other peers receive Interpolated. Remote
-/// is a connection/topology marker, not the marker for a replicated player
-/// entity; querying Remote here was the reason the previous visual system
-/// skipped the client's replicated player entirely.
-fn spawn_interpolated_player_visuals(
+/// Lightyear's Remote marker is present on the received server entity. This
+/// matches the existing host-avatar path and gives remote client players the
+/// same visual representation.
+fn spawn_remote_player_visuals(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    interpolated_players: Query<Entity, (With<Interpolated>, Without<NetworkPlayerVisual>)>,
+    remote_players: Query<Entity, (With<Remote>, Without<NetworkPlayerVisual>)>,
 ) {
-    if interpolated_players.is_empty() {
+    if remote_players.is_empty() {
         return;
     }
 
@@ -282,7 +248,7 @@ fn spawn_interpolated_player_visuals(
         ..default()
     });
 
-    for entity in &interpolated_players {
+    for entity in &remote_players {
         commands
             .entity(entity)
             .insert((
@@ -294,11 +260,11 @@ fn spawn_interpolated_player_visuals(
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(material.clone()),
                 Transform::default(),
-                Name::new("Interpolated Network Player Avatar"),
+                Name::new("Remote Network Player Avatar"),
             ));
 
         debug!(
-            "Attached network player visual to interpolated entity {:?}",
+            "Attached network player visual to remote entity {:?}",
             entity
         );
     }
