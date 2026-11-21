@@ -3,8 +3,7 @@ use bevy::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(PhysicsPlugins::default())
+        .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
         .add_plugins(WorldScenePlugin)
         .run();
 }
@@ -32,7 +31,7 @@ fn spawn_test_scene(
         Transform::default(),
     ));
 
-    // A few simple forms make scale, lighting, and depth immediately visible.
+    // Static geometry also participates in collision detection.
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(2.0, 2.0, 2.0))),
         MeshMaterial3d(materials.add(Color::srgb(0.35, 0.42, 0.48))),
@@ -49,12 +48,13 @@ fn spawn_test_scene(
         Transform::from_xyz(-4.0, 1.5, -2.0),
     ));
 
+    // Dynamic body: it should fall onto the floor when the physics schedule runs.
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.8).mesh().uv(32, 18))),
         MeshMaterial3d(materials.add(Color::srgb(0.55, 0.22, 0.18))),
-        RigidBody::Static,
+        RigidBody::Dynamic,
         Collider::sphere(0.8),
-        Transform::from_xyz(3.0, 0.8, -2.0),
+        Transform::from_xyz(3.0, 4.0, -2.0),
     ));
 
     commands.spawn((
