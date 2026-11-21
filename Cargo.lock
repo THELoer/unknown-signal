@@ -4498,6 +4498,7 @@ dependencies = [
  "avian3d",
  "bevy",
  "lightyear",
+ "serde",
 ]
 
 [[package]]
