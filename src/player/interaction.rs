@@ -18,6 +18,12 @@ const DROP_DISTANCE: f32 = 1.35;
 #[derive(Component)]
 struct PickupItem;
 
+#[derive(Component)]
+struct InteractionPromptText;
+
+#[derive(Component)]
+struct HeldItemText;
+
 #[derive(Resource, Default)]
 struct HeldItem(Option<Entity>);
 
@@ -26,8 +32,11 @@ pub struct InteractionPlugin;
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HeldItem>()
-            .add_systems(Startup, (spawn_test_door, spawn_test_pickup))
-            .add_systems(Update, (interact_with_door, animate_doors).chain());
+            .add_systems(Startup, (spawn_test_door, spawn_test_pickup, spawn_interaction_hud))
+            .add_systems(
+                Update,
+                (update_interaction_hud, interact_with_door, animate_doors).chain(),
+            );
     }
 }
 
@@ -47,6 +56,107 @@ impl Default for Door {
             animation_to: Quat::IDENTITY,
             animation_elapsed: DOOR_ANIMATION_SECONDS,
         }
+    }
+}
+
+fn spawn_interaction_hud(mut commands: Commands) {
+    commands.spawn((
+        InteractionPromptText,
+        Text::new(""),
+        TextFont {
+            font_size: FontSize::Px(18.0),
+            ..default()
+        },
+        TextColor(Color::srgb(0.88, 0.93, 0.91)),
+        Node {
+            position_type: PositionType::Absolute,
+            left: percent(0),
+            right: percent(0),
+            bottom: px(42),
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+    ));
+
+    commands.spawn((
+        HeldItemText,
+        Text::new(""),
+        TextFont {
+            font_size: FontSize::Px(13.0),
+            ..default()
+        },
+        TextColor(Color::srgb(0.70, 0.78, 0.79)),
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(24),
+            bottom: px(24),
+            ..default()
+        },
+    ));
+
+    commands.spawn((
+        Text::new("+"),
+        TextFont {
+            font_size: FontSize::Px(22.0),
+            ..default()
+        },
+        TextColor(Color::srgba(0.82, 0.89, 0.88, 0.72)),
+        Node {
+            position_type: PositionType::Absolute,
+            left: percent(50),
+            top: percent(50),
+            ..default()
+        },
+    ));
+}
+
+fn update_interaction_hud(
+    active: Res<GameplayActive>,
+    players: Query<Entity, With<Player>>,
+    cameras: Query<&GlobalTransform, With<PlayerCamera>>,
+    items: Query<Entity, With<PickupItem>>,
+    collider_bodies: Query<&ColliderOf>,
+    doors: Query<(), With<Door>>,
+    spatial_query: SpatialQuery,
+    held_item: Res<HeldItem>,
+    mut prompt_text: Query<&mut Text, (With<InteractionPromptText>, Without<HeldItemText>)>,
+    mut held_text: Query<&mut Text, (With<HeldItemText>, Without<InteractionPromptText>)>,
+) {
+    let mut prompt = String::new();
+    if active.0 {
+        if let (Ok(player), Ok(camera)) = (players.single(), cameras.single()) {
+            let transform = camera.compute_transform();
+            let filter = SpatialQueryFilter::from_excluded_entities([player]);
+            if let Some(hit) = spatial_query.cast_ray(
+                transform.translation,
+                transform.forward(),
+                INTERACTION_DISTANCE,
+                true,
+                &filter,
+            ) {
+                if items.get(hit.entity).is_ok() {
+                    prompt = "E  —  PICK UP".to_string();
+                } else if let Ok(collider_of) = collider_bodies.get(hit.entity) {
+                    if doors.get(collider_of.body).is_ok() {
+                        prompt = "E  —  OPEN / CLOSE".to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    if held_item.0.is_some() {
+        for mut text in &mut held_text {
+            **text = "CARRYING ITEM  ·  E TO DROP".to_string();
+        }
+    } else {
+        for mut text in &mut held_text {
+            **text = String::new();
+        }
+    }
+
+    for mut text in &mut prompt_text {
+        **text = prompt.clone();
     }
 }
 
