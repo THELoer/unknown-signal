@@ -63,6 +63,7 @@ fn spawn_test_door(
         .spawn((
             RigidBody::Kinematic,
             Door::default(),
+            Visibility::default(),
             Transform::from_xyz(-DOOR_WIDTH * 0.5, DOOR_HEIGHT * 0.5, 2.5),
         ))
         .id();
