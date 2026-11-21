@@ -59,8 +59,9 @@ impl Plugin for NetworkingPlugin {
             .init_resource::<PendingNetworkRequest>()
             .init_resource::<NetworkStatus>()
             .component::<Transform>()
-            .replicate()
-            .add_systems(Update, (start_requested_session, monitor_connection, spawn_remote_player_visuals))
+            .replicate();
+
+        app.add_systems(Update, (start_requested_session, monitor_connection, spawn_remote_player_visuals))
             .add_observer(add_replication_sender);
     }
 }
