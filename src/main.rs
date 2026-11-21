@@ -74,14 +74,7 @@ fn spawn_test_scene(
     });
 
     // Main room: 16 x 16 metres, with a low industrial ceiling.
-    spawn_box(
-        &mut commands,
-        cube.clone(),
-        floor.clone(),
-        Vec3::new(16.0, 0.2, 16.0),
-        Vec3::new(0.0, -0.1, 0.0),
-        true,
-    );
+    spawn_floor(&mut commands, cube.clone(), floor.clone());
     spawn_box(
         &mut commands,
         cube.clone(),
@@ -326,4 +319,24 @@ fn spawn_box(
         // The unit collider is scaled by the same Transform as the unit cube mesh.
         entity.insert((RigidBody::Static, Collider::cuboid(0.5, 0.5, 0.5)));
     }
+}
+
+
+/// Keeps the rendered floor and its physics shape in the same explicit world-space dimensions.
+fn spawn_floor(
+    commands: &mut Commands,
+    cube: Handle<Mesh>,
+    material: Handle<StandardMaterial>,
+) {
+    commands.spawn((
+        Mesh3d(cube),
+        MeshMaterial3d(material),
+        Transform::from_xyz(0.0, -0.1, 0.0).with_scale(Vec3::new(16.0, 0.2, 16.0)),
+    ));
+
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(8.0, 0.1, 8.0),
+        Transform::from_xyz(0.0, -0.1, 0.0),
+    ));
 }
