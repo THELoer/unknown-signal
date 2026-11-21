@@ -133,9 +133,7 @@ fn setup_menu(
                     border: UiRect::all(px(1)),
                     ..default()
                 },
-                BorderRadius::all(px(8)),
                 BackgroundColor(Color::srgba(0.025, 0.040, 0.050, 0.985)),
-                BorderColor::all(Color::srgb(0.22, 0.34, 0.37)),
             ))
             .with_children(|panel| {
                 panel.spawn((
@@ -211,8 +209,6 @@ fn setup_menu(
                             margin: UiRect::vertical(px(6)),
                             ..default()
                         },
-                        BorderRadius::all(px(4)),
-                        BorderColor::all(Color::srgb(0.32, 0.48, 0.47)),
                         BackgroundColor(Color::srgb(0.10, 0.25, 0.24)),
                     ))
                     .with_children(|button| {
@@ -239,8 +235,6 @@ fn setup_menu(
                             margin: UiRect::vertical(px(6)),
                             ..default()
                         },
-                        BorderRadius::all(px(4)),
-                        BorderColor::all(Color::srgb(0.28, 0.37, 0.39)),
                         BackgroundColor(Color::srgb(0.10, 0.15, 0.17)),
                     ))
                     .with_children(|button| {
@@ -269,8 +263,6 @@ fn setup_menu(
                             margin: UiRect::vertical(px(6)),
                             ..default()
                         },
-                        BorderRadius::all(px(4)),
-                        BorderColor::all(Color::srgb(0.24, 0.34, 0.36)),
                         BackgroundColor(Color::srgb(0.07, 0.11, 0.13)),
                     ))
                     .with_children(|button| {
@@ -495,9 +487,7 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                 row_gap: px(7),
                 ..default()
             },
-            BorderRadius::all(px(8)),
             BackgroundColor(Color::srgb(0.025, 0.040, 0.050)),
-            BorderColor::all(Color::srgb(0.22, 0.34, 0.37)),
         )).with_children(|panel| {
             panel.spawn((
                 Text::new("SYSTEM SETTINGS"),
@@ -564,8 +554,7 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                     Node {
                         width: percent(100),
                         height: px(5),
-                        border_radius: BorderRadius::MAX,
-                        ..default()
+                            ..default()
                     },
                     BackgroundColor(Color::srgb(0.13, 0.20, 0.21)),
                 ));
@@ -587,7 +576,6 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                             width: px(14),
                             height: px(14),
                             top: px(4),
-                            border_radius: BorderRadius::MAX,
                             ..default()
                         },
                         BackgroundColor(Color::srgb(0.91, 0.61, 0.27)),
@@ -667,8 +655,6 @@ fn spawn_action_button(parent: &mut ChildSpawnerCommands, label: &str, action: M
             margin: UiRect::vertical(px(2)),
             ..default()
         },
-        BorderRadius::all(px(4)),
-        BorderColor::all(Color::srgb(0.24, 0.37, 0.39)),
         BackgroundColor(Color::srgb(0.10, 0.17, 0.19)),
     )).with_children(|button| {
         button.spawn((
@@ -698,8 +684,6 @@ fn spawn_binding_button(
             margin: UiRect::vertical(px(1)),
             ..default()
         },
-        BorderRadius::all(px(3)),
-        BorderColor::all(Color::srgb(0.16, 0.25, 0.27)),
         BackgroundColor(Color::srgb(0.055, 0.09, 0.105)),
     )).with_children(|button| {
         button.spawn((
@@ -772,7 +756,11 @@ fn update_settings_text(
         };
     }
     for mut text in &mut sensitivity {
-        **text = format!("SENSITIVITY  {:.4}", settings.mouse_sensitivity);
+        **text = if editing_sensitivity.0 {
+            format!("{}_", sensitivity_buffer.0)
+        } else {
+            format!("{:.4}", settings.mouse_sensitivity)
+        };
     }
     for mut text in &mut invert {
         **text = if settings.invert_mouse_y { "INVERT Y: ON" } else { "INVERT Y: OFF" }.to_string();
@@ -834,16 +822,21 @@ fn capture_sensitivity_input(
 }
 
 fn sync_sensitivity_controls(
+    mut commands: Commands,
     mut settings: ResMut<PlayerSettings>,
-    mut sliders: Query<&mut SliderValue, With<SensitivitySlider>>,
+    changed_sliders: Query<&SliderValue, (With<SensitivitySlider>, Changed<SliderValue>)>,
+    sliders: Query<(Entity, &SliderValue), With<SensitivitySlider>>,
     mut thumbs: Query<&mut Node, With<SliderThumb>>,
 ) {
-    for mut slider in &mut sliders {
-        let clamped = slider.0.clamp(0.0005, 0.01);
-        if (clamped - settings.mouse_sensitivity).abs() > f32::EPSILON {
-            settings.mouse_sensitivity = clamped;
+    // SliderValue is immutable in Bevy 0.20: read changes and replace the component
+    // when settings are changed from the numeric-entry control.
+    for slider in &changed_sliders {
+        settings.mouse_sensitivity = slider.0.clamp(0.0005, 0.01);
+    }
+    for (entity, slider) in &sliders {
+        if (slider.0 - settings.mouse_sensitivity).abs() > f32::EPSILON {
+            commands.entity(entity).insert(SliderValue(settings.mouse_sensitivity));
         }
-        slider.0 = settings.mouse_sensitivity;
     }
     let position = ((settings.mouse_sensitivity - 0.0005) / 0.0095 * 100.0).clamp(0.0, 100.0);
     for mut node in &mut thumbs {
