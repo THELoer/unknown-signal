@@ -250,7 +250,11 @@ fn spawn_remote_player_visuals(
     mut materials: ResMut<Assets<StandardMaterial>>,
     remote_players: Query<
         Entity,
-        (With<Remote>, Without<Controlled>, Without<NetworkPlayerVisual>),
+        (
+            With<Remote>,
+            Without<Controlled>,
+            Without<NetworkPlayerVisual>,
+        ),
     >,
 ) {
     if remote_players.is_empty() {

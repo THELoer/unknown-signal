@@ -7,8 +7,8 @@ use lightyear::connection::server::Start;
 use lightyear::prelude::client::{ClientPlugins, Connect, RawClient};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::prelude::{
-    AppComponentExt, Client, Connected, Link, LocalAddr,
-    NetworkTarget, PeerAddr, Replicate, ReplicationReceiver, ReplicationSender, UdpIo,
+    AppComponentExt, Client, Connected, Link, LocalAddr, NetworkTarget, PeerAddr, Replicate,
+    ReplicationReceiver, ReplicationSender, UdpIo,
 };
 
 mod diagnostics;
@@ -207,7 +207,9 @@ fn add_replication_sender(
     if server_links.get(trigger.entity).is_ok() && host_clients.get(trigger.entity).is_err() {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
-            commands.entity(player).insert(Replicate::to_clients(NetworkTarget::All));
+            commands
+                .entity(player)
+                .insert(Replicate::to_clients(NetworkTarget::All));
         }
         info!(
             "Remote peer {:?} connected; host player replication enabled",

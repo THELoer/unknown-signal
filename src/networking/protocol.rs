@@ -16,15 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Movement axes are normalized to [-1, 1]. Yaw is expressed in radians and is
 /// sampled from the local player root, not from the camera pitch. Jump is a
 /// one-tick edge, while sprint and crouch are held states.
-#[derive(
-    Serialize,
-    Deserialize,
-    Debug,
-    Default,
-    PartialEq,
-    Clone,
-    Reflect,
-)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Reflect)]
 pub(crate) struct NetworkPlayerInput {
     pub(crate) move_x: f32,
     pub(crate) move_y: f32,
@@ -48,11 +40,7 @@ impl NetworkPlayerInput {
     pub(crate) fn sanitize(&mut self) {
         self.move_x = finite_axis(self.move_x);
         self.move_y = finite_axis(self.move_y);
-        self.yaw = if self.yaw.is_finite() {
-            self.yaw
-        } else {
-            0.0
-        };
+        self.yaw = if self.yaw.is_finite() { self.yaw } else { 0.0 };
         let length = self.move_x.hypot(self.move_y);
         if length > 1.0 {
             self.move_x /= length;
