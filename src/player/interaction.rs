@@ -4,6 +4,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 use super::controller::{Player, PlayerCamera};
+use crate::player::GameplayActive;
 
 const INTERACTION_DISTANCE: f32 = 3.0;
 const DOOR_ANIMATION_SECONDS: f32 = 0.38;
