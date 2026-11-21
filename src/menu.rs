@@ -17,6 +17,9 @@ use crate::{
 struct MenuRoot;
 
 #[derive(Component)]
+struct MenuCamera;
+
+#[derive(Component)]
 struct MenuStatusText;
 
 #[derive(Component)]
@@ -66,7 +69,7 @@ fn setup_menu(
         cursor.visible = true;
     }
 
-    commands.spawn((Camera2d, Camera { order: 10, ..default() }));
+    commands.spawn((Camera2d, Camera { order: 10, ..default() }, MenuCamera));
     commands
         .spawn((
             MenuRoot,
@@ -330,6 +333,7 @@ fn close_menu_after_connection(
     status: Res<NetworkStatus>,
     mut gameplay: ResMut<GameplayActive>,
     mut menu_roots: Query<Entity, With<MenuRoot>>,
+    mut menu_cameras: Query<Entity, With<MenuCamera>>,
     mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     if !status.connected || gameplay.0 {
@@ -337,6 +341,9 @@ fn close_menu_after_connection(
     }
 
     for entity in &mut menu_roots {
+        commands.entity(entity).despawn();
+    }
+    for entity in &mut menu_cameras {
         commands.entity(entity).despawn();
     }
     gameplay.0 = true;
