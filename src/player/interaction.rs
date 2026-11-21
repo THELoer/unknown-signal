@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use super::controller::{Player, PlayerCamera};
+use super::controller::{Player, PlayerCamera, PlayerSettings};
 use crate::player::GameplayActive;
 
 const INTERACTION_DISTANCE: f32 = 3.0;
@@ -186,6 +186,7 @@ fn spawn_frame_piece(
 fn interact_with_door(
     mut commands: Commands,
     active: Res<GameplayActive>,
+    settings: Res<PlayerSettings>,
     keyboard: Res<ButtonInput<KeyCode>>,
     players: Query<Entity, With<Player>>,
     cameras: Query<(Entity, &GlobalTransform), With<PlayerCamera>>,
@@ -195,7 +196,7 @@ fn interact_with_door(
     spatial_query: SpatialQuery,
     mut held_item: ResMut<HeldItem>,
 ) {
-    if !active.0 || !keyboard.just_pressed(KeyCode::KeyE) {
+    if !active.0 || !keyboard.just_pressed(settings.interact) {
         return;
     }
 
