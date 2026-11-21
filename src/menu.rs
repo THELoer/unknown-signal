@@ -417,16 +417,27 @@ fn update_menu_text(
 }
 
 fn update_button_appearance(
-    mut buttons: Query<(&Hovered, Has<Pressed>, &mut BackgroundColor), With<MenuAction>>,
+    mut buttons: Query<(&MenuAction, &Hovered, Has<Pressed>, &mut BackgroundColor), With<Button>>,
 ) {
-    for (hovered, pressed, mut color) in &mut buttons {
-        *color = if pressed {
-            Color::srgb(0.34, 0.42, 0.34).into()
-        } else if hovered.get() {
-            Color::srgb(0.25, 0.34, 0.35).into()
-        } else {
-            Color::srgb(0.16, 0.23, 0.25).into()
+    for (action, hovered, pressed, mut color) in &mut buttons {
+        let (normal, hot, down) = match action {
+            MenuAction::Host => (
+                Color::srgb(0.10, 0.25, 0.24),
+                Color::srgb(0.14, 0.36, 0.32),
+                Color::srgb(0.07, 0.18, 0.17),
+            ),
+            MenuAction::Connect => (
+                Color::srgb(0.10, 0.15, 0.17),
+                Color::srgb(0.17, 0.25, 0.27),
+                Color::srgb(0.07, 0.11, 0.13),
+            ),
+            _ => (
+                Color::srgb(0.07, 0.11, 0.13),
+                Color::srgb(0.15, 0.23, 0.24),
+                Color::srgb(0.05, 0.08, 0.09),
+            ),
         };
+        *color = if pressed { down } else if hovered.get() { hot } else { normal }.into();
     }
 }
 
