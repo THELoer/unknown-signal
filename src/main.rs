@@ -6,7 +6,7 @@ use bevy::prelude::*;
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
-        .add_plugins((WorldScenePlugin, player::PlayerPlugin))
+        .add_plugins((WorldScenePlugin, player::PlayerPlugin, player::InteractionPlugin))
         .run();
 }
 
