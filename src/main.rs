@@ -264,8 +264,8 @@ fn spawn_test_scene(
         commands.spawn((
             PointLight {
                 color,
-                intensity: 850.0,
-                range: 9.0,
+                intensity: 7_500.0,
+                range: 16.0,
                 radius: 0.18,
                 shadow_maps_enabled: false,
                 ..default()
