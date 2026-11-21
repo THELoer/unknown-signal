@@ -51,6 +51,9 @@ struct SensitivitySlider;
 #[derive(Resource, Default)]
 struct EditingSensitivity(bool);
 
+#[derive(Resource, Default)]
+struct SensitivityBuffer(String);
+
 #[derive(Component)]
 struct InvertYLabel;
 
@@ -76,6 +79,7 @@ impl Plugin for MainMenuPlugin {
         app.init_resource::<AddressInput>()
             .init_resource::<PendingRebind>()
             .init_resource::<EditingSensitivity>()
+            .init_resource::<SensitivityBuffer>()
             .add_systems(Startup, setup_menu)
             .add_systems(
                 Update,
@@ -340,6 +344,7 @@ fn handle_menu_buttons(
     mut settings: ResMut<PlayerSettings>,
     mut pending_rebind: ResMut<PendingRebind>,
     mut editing_sensitivity: ResMut<EditingSensitivity>,
+    mut sensitivity_buffer: ResMut<SensitivityBuffer>,
     overlays: Query<Entity, With<SettingsOverlay>>,
 ) {
     for action in &buttons {
@@ -360,7 +365,12 @@ fn handle_menu_buttons(
                 pending_rebind.0 = None;
                 editing_sensitivity.0 = false;
             }
-            MenuAction::EditSensitivity => editing_sensitivity.0 = !editing_sensitivity.0,
+            MenuAction::EditSensitivity => {
+                editing_sensitivity.0 = !editing_sensitivity.0;
+                if editing_sensitivity.0 {
+                    sensitivity_buffer.0 = format!("{:.4}", settings.mouse_sensitivity);
+                }
+            },
             MenuAction::ToggleInvertY => settings.invert_mouse_y = !settings.invert_mouse_y,
             MenuAction::Rebind(action) => pending_rebind.0 = Some(*action),
             MenuAction::Connect => match address.0.parse::<SocketAddr>() {
@@ -715,6 +725,8 @@ fn capture_rebind(
 
 fn update_settings_text(
     settings: Res<PlayerSettings>,
+    editing_sensitivity: Res<EditingSensitivity>,
+    sensitivity_buffer: Res<SensitivityBuffer>,
     pending: Res<PendingRebind>,
     mut bindings: Query<(&BindingLabel, &mut Text)>,
     mut sensitivity: Query<&mut Text, (With<SensitivityLabel>, Without<BindingLabel>)>,
@@ -747,16 +759,46 @@ fn update_settings_text(
 fn capture_sensitivity_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut editing: ResMut<EditingSensitivity>,
+    mut buffer: ResMut<SensitivityBuffer>,
     mut settings: ResMut<PlayerSettings>,
 ) {
     if !editing.0 { return; }
-    if keyboard.just_pressed(KeyCode::Escape) || keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::NumpadEnter) {
+    if keyboard.just_pressed(KeyCode::Escape) {
+        editing.0 = false;
+        return;
+    }
+    if keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::NumpadEnter) {
+        if let Ok(value) = buffer.0.parse::<f32>() {
+            if value.is_finite() {
+                settings.mouse_sensitivity = value.clamp(0.0005, 0.01);
+            }
+        }
         editing.0 = false;
         return;
     }
     if keyboard.just_pressed(KeyCode::Backspace) {
-        // Keep a short edit buffer in the settings label text; handled by the dedicated buffer below.
-        return;
+        buffer.0.pop();
+    }
+    for (key, character) in [
+        (KeyCode::Digit0, '0'), (KeyCode::Digit1, '1'),
+        (KeyCode::Digit2, '2'), (KeyCode::Digit3, '3'),
+        (KeyCode::Digit4, '4'), (KeyCode::Digit5, '5'),
+        (KeyCode::Digit6, '6'), (KeyCode::Digit7, '7'),
+        (KeyCode::Digit8, '8'), (KeyCode::Digit9, '9'),
+        (KeyCode::Numpad0, '0'), (KeyCode::Numpad1, '1'),
+        (KeyCode::Numpad2, '2'), (KeyCode::Numpad3, '3'),
+        (KeyCode::Numpad4, '4'), (KeyCode::Numpad5, '5'),
+        (KeyCode::Numpad6, '6'), (KeyCode::Numpad7, '7'),
+        (KeyCode::Numpad8, '8'), (KeyCode::Numpad9, '9'),
+    ] {
+        if keyboard.just_pressed(key) && buffer.0.len() < 8 {
+            buffer.0.push(character);
+        }
+    }
+    if (keyboard.just_pressed(KeyCode::Period) || keyboard.just_pressed(KeyCode::NumpadDecimal))
+        && !buffer.0.contains('.') && buffer.0.len() < 8
+    {
+        buffer.0.push('.');
     }
 }
 
