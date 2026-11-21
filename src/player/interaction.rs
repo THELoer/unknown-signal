@@ -3,18 +3,29 @@ use std::f32::consts::FRAC_PI_2;
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use super::controller::{CameraPitch, EYE_HEIGHT, Player, PlayerCamera};
+use super::controller::{Player, PlayerCamera};
 
 const INTERACTION_DISTANCE: f32 = 3.0;
 const DOOR_ANIMATION_SECONDS: f32 = 0.38;
 const DOOR_WIDTH: f32 = 1.4;
 const DOOR_HEIGHT: f32 = 2.2;
 
+const PICKUP_ITEM_HALF_EXTENT: f32 = 0.22;
+const HELD_ITEM_OFFSET: Vec3 = Vec3::new(0.28, -0.22, -0.85);
+const DROP_DISTANCE: f32 = 1.35;
+
+#[derive(Component)]
+struct PickupItem;
+
+#[derive(Resource, Default)]
+struct HeldItem(Option<Entity>);
+
 pub struct InteractionPlugin;
 
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_test_door)
+        app.init_resource::<HeldItem>()
+            .add_systems(Startup, (spawn_test_door, spawn_test_pickup))
             .add_systems(Update, (interact_with_door, animate_doors).chain());
     }
 }
@@ -127,6 +138,34 @@ fn spawn_test_door(
     }
 }
 
+fn spawn_test_pickup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let mesh = meshes.add(Cuboid::new(0.44, 0.44, 0.44));
+    let material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.34, 0.25, 0.15),
+        metallic: 0.28,
+        perceptual_roughness: 0.88,
+        ..default()
+    });
+
+    commands.spawn((
+        PickupItem,
+        Mesh3d(mesh),
+        MeshMaterial3d(material),
+        RigidBody::Dynamic,
+        Collider::cuboid(
+            PICKUP_ITEM_HALF_EXTENT,
+            PICKUP_ITEM_HALF_EXTENT,
+            PICKUP_ITEM_HALF_EXTENT,
+        ),
+        Transform::from_xyz(0.0, 1.1, 3.8),
+        LinearVelocity::default(),
+    ));
+}
+
 fn spawn_frame_piece(
     commands: &mut Commands,
     mesh: Handle<Mesh>,
@@ -144,35 +183,74 @@ fn spawn_frame_piece(
 }
 
 fn interact_with_door(
+    mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
-    players: Query<(Entity, &Transform), With<Player>>,
-    cameras: Query<&CameraPitch, With<PlayerCamera>>,
+    players: Query<Entity, With<Player>>,
+    cameras: Query<(Entity, &GlobalTransform), With<PlayerCamera>>,
+    items: Query<Entity, With<PickupItem>>,
     collider_bodies: Query<&ColliderOf>,
     mut doors: Query<(&Transform, &mut Door), Without<Player>>,
     spatial_query: SpatialQuery,
+    mut held_item: ResMut<HeldItem>,
 ) {
     if !keyboard.just_pressed(KeyCode::KeyE) {
         return;
     }
 
-    let Ok((player_entity, player_transform)) = players.single() else {
+    let Ok(player_entity) = players.single() else {
         return;
     };
-    let Ok(camera_pitch) = cameras.single() else {
+    let Ok((camera_entity, camera_global)) = cameras.single() else {
         return;
     };
+    let camera_transform = camera_global.compute_transform();
 
-    let camera_rotation = player_transform.rotation * Quat::from_rotation_x(camera_pitch.0);
-    let direction = camera_rotation * Dir3::NEG_Z;
-    let origin = player_transform.translation + Vec3::Y * EYE_HEIGHT;
+    // Pressing E while carrying an object drops it in front of the player.
+    if let Some(item_entity) = held_item.0.take() {
+        let drop_position =
+            camera_transform.translation + *camera_transform.forward() * DROP_DISTANCE;
+        commands.entity(item_entity).remove::<ChildOf>().insert((
+            RigidBody::Dynamic,
+            Collider::cuboid(
+                PICKUP_ITEM_HALF_EXTENT,
+                PICKUP_ITEM_HALF_EXTENT,
+                PICKUP_ITEM_HALF_EXTENT,
+            ),
+            LinearVelocity::default(),
+            Transform::from_translation(drop_position)
+                .with_rotation(camera_transform.rotation),
+        ));
+        info!("Dropped item");
+        return;
+    }
+
     let filter = SpatialQueryFilter::from_excluded_entities([player_entity]);
-
-    let Some(hit) = spatial_query.cast_ray(origin, direction, INTERACTION_DISTANCE, true, &filter)
-    else {
+    let Some(hit) = spatial_query.cast_ray(
+        camera_transform.translation,
+        camera_transform.forward(),
+        INTERACTION_DISTANCE,
+        true,
+        &filter,
+    ) else {
         return;
     };
 
-    // The ray hits the offset child collider; resolve its owning hinge body.
+    // Pickup targets take priority over doors when the ray hits an item.
+    if items.get(hit.entity).is_ok() {
+        commands.entity(hit.entity)
+            .remove::<RigidBody>()
+            .remove::<Collider>()
+            .remove::<LinearVelocity>()
+            .insert((
+                ChildOf(camera_entity),
+                Transform::from_translation(HELD_ITEM_OFFSET),
+            ));
+        held_item.0 = Some(hit.entity);
+        info!("Picked up item");
+        return;
+    }
+
+    // Door leaf colliders are children; resolve their owning hinge body.
     let Ok(collider_of) = collider_bodies.get(hit.entity) else {
         return;
     };
