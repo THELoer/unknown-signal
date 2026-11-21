@@ -87,6 +87,7 @@ fn spawn_player(mut commands: Commands) {
             PlayerMovementSettings::default(),
             Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH),
             LinearVelocity::default(),
+            TransformInterpolation,
             Transform::from_xyz(0.0, 1.0, 5.0),
         ))
         .with_child((
@@ -202,7 +203,7 @@ fn move_player(
                 .cast_ray(
                     head_origin,
                     Dir3::Y,
-                    STANCE_HEIGHT_DELTA + 0.05,
+                    STANDING_CAPSULE_LENGTH - CROUCHED_CAPSULE_LENGTH + 0.05,
                     true,
                     &SpatialQueryFilter::from_excluded_entities([entity]),
                 )
