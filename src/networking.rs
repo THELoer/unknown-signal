@@ -61,8 +61,15 @@ impl Plugin for NetworkingPlugin {
             .component::<Transform>()
             .replicate();
 
-        app.add_systems(Update, (start_requested_session, monitor_connection, spawn_remote_player_visuals))
-            .add_observer(add_replication_sender);
+        app.add_systems(
+            Update,
+            (
+                start_requested_session,
+                monitor_connection,
+                spawn_remote_player_visuals,
+            ),
+        )
+        .add_observer(add_replication_sender);
     }
 }
 
@@ -132,7 +139,9 @@ fn add_replication_sender(
     if server_links.get(trigger.entity).is_ok() {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
-            commands.entity(player).insert(Replicate::to_clients(NetworkTarget::All));
+            commands
+                .entity(player)
+                .insert(Replicate::to_clients(NetworkTarget::All));
         }
         info!("A remote client connected; player transform replication enabled");
     }
@@ -155,7 +164,6 @@ fn monitor_connection(
     info!("{}", status.message);
 }
 
-
 #[derive(Component)]
 struct RemotePlayerVisual;
 
@@ -165,7 +173,9 @@ fn spawn_remote_player_visuals(
     mut materials: ResMut<Assets<StandardMaterial>>,
     remote_players: Query<(Entity, &Transform), (With<Remote>, Without<RemotePlayerVisual>)>,
 ) {
-    if remote_players.is_empty() { return; }
+    if remote_players.is_empty() {
+        return;
+    }
     let mesh = meshes.add(Capsule3d::new(0.28, 1.0));
     let material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.22, 0.48, 0.52),
@@ -174,12 +184,15 @@ fn spawn_remote_player_visuals(
         ..default()
     });
     for (entity, _) in &remote_players {
-        commands.entity(entity).insert(RemotePlayerVisual).with_child((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(material.clone()),
-            Transform::default(),
-            Name::new("Remote Player Avatar"),
-        ));
+        commands
+            .entity(entity)
+            .insert(RemotePlayerVisual)
+            .with_child((
+                Mesh3d(mesh.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform::default(),
+                Name::new("Remote Player Avatar"),
+            ));
         info!("Spawned visual for replicated remote player {entity:?}");
     }
 }
