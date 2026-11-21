@@ -15,6 +15,10 @@ const CROUCHED_CAPSULE_LENGTH: f32 = 0.45;
 const STANCE_HEIGHT_DELTA: f32 = (STANDING_CAPSULE_LENGTH - CROUCHED_CAPSULE_LENGTH) * 0.5;
 pub(super) const EYE_HEIGHT: f32 = 0.55;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.05;
+const STAMINA_MAX: f32 = 100.0;
+const SPRINT_DRAIN_PER_SECOND: f32 = 26.0;
+const STAMINA_REGEN_PER_SECOND: f32 = 18.0;
+const STAMINA_REGEN_DELAY: f32 = 0.85;
 
 #[derive(Resource, Default)]
 pub struct GameplayActive(pub bool);
@@ -102,7 +106,8 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<PlayerInput>()
             .init_resource::<GameplayActive>()
             .init_resource::<PlayerSettings>()
-            .add_systems(Startup, spawn_player)
+            .init_resource::<PlayerStamina>()
+            .add_systems(Startup, (spawn_player, spawn_stamina_hud))
             .add_systems(
                 PreUpdate,
                 (
@@ -115,7 +120,7 @@ impl Plugin for PlayerPlugin {
                     .after(InputSystems),
             )
             .add_systems(FixedUpdate, move_player)
-            .add_systems(Update, update_camera_stance);
+            .add_systems(Update, (update_camera_stance, update_stamina_hud));
     }
 }
 
@@ -168,6 +173,38 @@ impl Default for PlayerMovementSettings {
     }
 }
 
+#[derive(Resource)]
+struct PlayerStamina {
+    current: f32,
+    regen_cooldown: f32,
+}
+
+impl Default for PlayerStamina {
+    fn default() -> Self {
+        Self { current: STAMINA_MAX, regen_cooldown: 0.0 }
+    }
+}
+
+#[derive(Component)]
+struct StaminaHud;
+
+fn spawn_stamina_hud(mut commands: Commands) {
+    commands.spawn((
+        StaminaHud,
+        Text::new("STAMINA  100%"),
+        TextFont { font_size: FontSize::Px(14.0), ..default() },
+        TextColor(Color::srgb(0.68, 0.84, 0.78)),
+        Node { position_type: PositionType::Absolute, left: px(24), top: px(24), ..default() },
+    ));
+}
+
+fn update_stamina_hud(stamina: Res<PlayerStamina>, mut labels: Query<&mut Text, With<StaminaHud>>) {
+    let percent = (stamina.current / STAMINA_MAX * 100.0).round() as u32;
+    for mut label in &mut labels {
+        **label = format!("STAMINA  {percent:>3}%");
+    }
+}
+
 #[derive(Resource, Default)]
 struct PlayerInput {
     movement: Vec2,
@@ -198,8 +235,8 @@ fn spawn_player(mut commands: Commands) {
                 ..default()
             },
             Vignette {
-                intensity: 0.28,
-                radius: 0.82,
+                intensity: 0.14,
+                radius: 0.86,
                 smoothness: 0.72,
                 roundness: 1.0,
                 center: Vec2::splat(0.5),
@@ -211,14 +248,14 @@ fn spawn_player(mut commands: Commands) {
             CameraPitch::default(),
             AmbientLight {
                 color: Color::srgb(0.42, 0.50, 0.66),
-                brightness: 95.0,
+                brightness: 260.0,
                 ..default()
             },
             DistanceFog {
                 color: Color::srgb(0.035, 0.045, 0.065),
                 falloff: FogFalloff::Linear {
-                    start: 9.0,
-                    end: 34.0,
+                    start: 14.0,
+                    end: 48.0,
                 },
                 ..default()
             },
@@ -343,6 +380,7 @@ fn move_player(
     time: Res<Time>,
     active: Res<GameplayActive>,
     mut player_input: ResMut<PlayerInput>,
+    mut stamina: ResMut<PlayerStamina>,
     mut players: Query<
         (
             Entity,
@@ -431,9 +469,22 @@ fn move_player(
         let wish_direction = (right * player_input.movement.x + forward * player_input.movement.y)
             .normalize_or_zero();
 
+        let sprinting = player_input.sprint
+            && !stance.crouched
+            && player_input.movement != Vec2::ZERO
+            && stamina.current > 0.0;
+        if sprinting {
+            stamina.current = (stamina.current - SPRINT_DRAIN_PER_SECOND * delta).max(0.0);
+            stamina.regen_cooldown = STAMINA_REGEN_DELAY;
+        } else if stamina.regen_cooldown > 0.0 {
+            stamina.regen_cooldown = (stamina.regen_cooldown - delta).max(0.0);
+        } else {
+            stamina.current = (stamina.current + STAMINA_REGEN_PER_SECOND * delta).min(STAMINA_MAX);
+        }
+
         let max_speed = if stance.crouched {
             settings.crouch_speed
-        } else if player_input.sprint {
+        } else if sprinting {
             settings.sprint_speed
         } else {
             settings.walk_speed
