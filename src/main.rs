@@ -152,71 +152,71 @@ fn spawn_test_scene(
     // Heavy structural ribs and wall-mounted service panels.
     for z in [-6.0, -2.0, 2.0, 6.0] {
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        trim.clone(),
-        Vec3::new(16.0, 0.16, 0.20),
-        Vec3::new(0.0, 4.78, z),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            trim.clone(),
+            Vec3::new(16.0, 0.16, 0.20),
+            Vec3::new(0.0, 4.78, z),
+            false,
+        );
     }
     for x in [-7.65, -4.0, 4.0, 7.65] {
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        trim.clone(),
-        Vec3::new(0.16, 4.8, 0.28),
-        Vec3::new(x, 2.5, -7.82),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            trim.clone(),
+            Vec3::new(0.16, 4.8, 0.28),
+            Vec3::new(x, 2.5, -7.82),
+            false,
+        );
     }
     for z in [-5.5, -1.5, 4.5] {
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        panel.clone(),
-        Vec3::new(0.12, 1.35, 1.7),
-        Vec3::new(-7.82, 2.7, z),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            panel.clone(),
+            Vec3::new(0.12, 1.35, 1.7),
+            Vec3::new(-7.82, 2.7, z),
+            false,
+        );
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        trim.clone(),
-        Vec3::new(0.14, 0.08, 1.8),
-        Vec3::new(-7.72, 3.38, z),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            trim.clone(),
+            Vec3::new(0.14, 0.08, 1.8),
+            Vec3::new(-7.72, 3.38, z),
+            false,
+        );
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        panel.clone(),
-        Vec3::new(0.12, 1.35, 1.7),
-        Vec3::new(7.82, 2.7, z),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            panel.clone(),
+            Vec3::new(0.12, 1.35, 1.7),
+            Vec3::new(7.82, 2.7, z),
+            false,
+        );
     }
 
     // Yellow safety markings along the room edges and around the doorway.
     for x in [-7.35, 7.35] {
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        hazard.clone(),
-        Vec3::new(0.07, 0.012, 15.0),
-        Vec3::new(x, 0.012, 0.0),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            hazard.clone(),
+            Vec3::new(0.07, 0.012, 15.0),
+            Vec3::new(x, 0.012, 0.0),
+            false,
+        );
     }
     for x in [-0.95, 0.95] {
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        hazard.clone(),
-        Vec3::new(0.045, 0.018, 0.55),
-        Vec3::new(x, 0.02, 2.5),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            hazard.clone(),
+            Vec3::new(0.045, 0.018, 0.55),
+            Vec3::new(x, 0.02, 2.5),
+            false,
+        );
     }
 
     // A few chunky equipment crates give the room readable scale.
@@ -261,13 +261,13 @@ fn spawn_test_scene(
         (4.5, 4.5, Color::srgb(0.68, 0.80, 1.0)),
     ] {
         spawn_box(
-        &mut commands,
-        cube.clone(),
-        lamp_material.clone(),
-        Vec3::new(1.35, 0.08, 0.42),
-        Vec3::new(x, 4.82, z),
-        false,
-    );
+            &mut commands,
+            cube.clone(),
+            lamp_material.clone(),
+            Vec3::new(1.35, 0.08, 0.42),
+            Vec3::new(x, 4.82, z),
+            false,
+        );
         commands.spawn((
             PointLight {
                 color,
