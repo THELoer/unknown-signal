@@ -140,7 +140,7 @@ fn add_replication_sender(
     // Host mode also has a local client endpoint. Only server-side peer links
     // should receive a replication sender.
     if server_links.get(trigger.entity).is_ok()
-        && !host_clients.get(trigger.entity).unwrap_or(false)
+        && host_clients.get(trigger.entity).is_err()
     {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
