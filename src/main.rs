@@ -1,3 +1,5 @@
+mod menu;
+mod networking;
 mod player;
 
 use avian3d::prelude::{Collider, PhysicsPlugins, RigidBody};
@@ -7,6 +9,8 @@ fn main() {
     App::new()
         .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
         .add_plugins((
+            networking::NetworkingPlugin,
+            menu::MainMenuPlugin,
             WorldScenePlugin,
             player::PlayerPlugin,
             player::InteractionPlugin,
