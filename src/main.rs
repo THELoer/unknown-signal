@@ -49,9 +49,9 @@ fn spawn_test_scene(
 
     commands.spawn((
         PointLight {
-            intensity: 3_000_000.0,
+            intensity: 4_000.0,
             range: 30.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(2.0, 7.0, 4.0),
