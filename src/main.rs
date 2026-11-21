@@ -1,10 +1,12 @@
+mod player;
+
 use avian3d::prelude::{Collider, PhysicsPlugins, RigidBody};
 use bevy::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
-        .add_plugins(WorldScenePlugin)
+        .add_plugins((WorldScenePlugin, player::PlayerPlugin))
         .run();
 }
 
@@ -65,10 +67,5 @@ fn spawn_test_scene(
             ..default()
         },
         Transform::from_xyz(2.0, 7.0, 4.0),
-    ));
-
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(-9.0, 7.0, 12.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
