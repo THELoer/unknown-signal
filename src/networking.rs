@@ -218,7 +218,7 @@ fn add_replication_sender(
 /// existence of a Client entity as proof of a successful connection.
 fn monitor_connection(
     clients: Query<(), (With<Client>, With<Connected>)>,
-    server_peers: Query<(), (With<LinkOf>, With<Connected>)>,
+    server_peers: Query<(), (With<LinkOf>, With<Connected>, Without<HostClient>)>,
     mut status: ResMut<NetworkStatus>,
 ) {
     if !status.requested {
