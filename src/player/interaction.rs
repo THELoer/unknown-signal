@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use super::controller::{CameraPitch, Player, PlayerCamera, EYE_HEIGHT};
+use super::controller::{CameraPitch, EYE_HEIGHT, Player, PlayerCamera};
 
 const INTERACTION_DISTANCE: f32 = 3.0;
 const DOOR_ANIMATION_SECONDS: f32 = 0.38;
@@ -72,8 +72,11 @@ fn spawn_test_door(
         children.spawn((
             Mesh3d(cube.clone()),
             MeshMaterial3d(door_material.clone()),
-            Transform::from_xyz(DOOR_WIDTH * 0.5, 0.0, 0.0)
-                .with_scale(Vec3::new(DOOR_WIDTH, DOOR_HEIGHT, 0.14)),
+            Transform::from_xyz(DOOR_WIDTH * 0.5, 0.0, 0.0).with_scale(Vec3::new(
+                DOOR_WIDTH,
+                DOOR_HEIGHT,
+                0.14,
+            )),
         ));
         children.spawn((
             Collider::cuboid(DOOR_WIDTH * 0.5, DOOR_HEIGHT * 0.5, 0.07),
@@ -158,19 +161,13 @@ fn interact_with_door(
         return;
     };
 
-    let camera_rotation =
-        player_transform.rotation * Quat::from_rotation_x(camera_pitch.0);
+    let camera_rotation = player_transform.rotation * Quat::from_rotation_x(camera_pitch.0);
     let direction = camera_rotation * Dir3::NEG_Z;
     let origin = player_transform.translation + Vec3::Y * EYE_HEIGHT;
     let filter = SpatialQueryFilter::from_excluded_entities([player_entity]);
 
-    let Some(hit) = spatial_query.cast_ray(
-        origin,
-        direction,
-        INTERACTION_DISTANCE,
-        true,
-        &filter,
-    ) else {
+    let Some(hit) = spatial_query.cast_ray(origin, direction, INTERACTION_DISTANCE, true, &filter)
+    else {
         return;
     };
 
@@ -191,10 +188,7 @@ fn interact_with_door(
     };
     door.animation_elapsed = 0.0;
 
-    info!(
-        "Door {}",
-        if door.is_open { "opened" } else { "closed" }
-    );
+    info!("Door {}", if door.is_open { "opened" } else { "closed" });
 }
 
 fn animate_doors(time: Res<Time>, mut doors: Query<(&mut Transform, &mut Door)>) {
