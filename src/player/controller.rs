@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use avian3d::{math::*, prelude::*};
 use bevy::{
-    input::mouse::AccumulatedMouseMotion,
+    input::{InputSystems, mouse::AccumulatedMouseMotion},
     prelude::*,
     window::{CursorGrabMode, CursorOptions, PrimaryWindow},
 };
@@ -21,7 +21,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>()
             .add_systems(Startup, (spawn_player, lock_cursor))
-            .add_systems(PreUpdate, capture_player_input)
+            .add_systems(PreUpdate, capture_player_input.after(InputSystems))
             .add_systems(Update, (handle_cursor, update_camera_look).chain())
             .add_systems(FixedUpdate, move_player);
     }
