@@ -250,10 +250,10 @@ fn capture_player_input(
         return;
     }
 
-    let horizontal =
-        (keyboard.pressed(settings.move_right) as i8) - (keyboard.pressed(settings.move_left) as i8);
-    let vertical =
-        (keyboard.pressed(settings.move_forward) as i8) - (keyboard.pressed(settings.move_backward) as i8);
+    let horizontal = (keyboard.pressed(settings.move_right) as i8)
+        - (keyboard.pressed(settings.move_left) as i8);
+    let vertical = (keyboard.pressed(settings.move_forward) as i8)
+        - (keyboard.pressed(settings.move_backward) as i8);
 
     player_input.movement = Vec2::new(horizontal as f32, vertical as f32).clamp_length_max(1.0);
     player_input.sprint = keyboard.pressed(settings.sprint);
