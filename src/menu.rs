@@ -760,7 +760,7 @@ fn update_settings_text(
         **text = if editing_sensitivity.0 {
             format!("{}_", sensitivity_buffer.0)
         } else {
-            format!("{:.4}", settings.mouse_sensitivity)
+            format!("{:.2}", sensitivity_to_ui(settings.mouse_sensitivity))
         };
     }
     for mut text in &mut invert {
