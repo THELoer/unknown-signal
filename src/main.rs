@@ -37,16 +37,16 @@ fn spawn_test_scene(
 
     // Load both supplied Blender models as complete GLB scenes. Their meshes,
     // materials and embedded textures are imported by Bevy from the files.
-    let iron_cube_scene: Handle<Scene> = asset_server.load("models/cube.glb#Scene0");
+    let iron_cube_scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/cube.glb"));
     commands.spawn((
-        SceneRoot(iron_cube_scene),
+        WorldAssetRoot(iron_cube_scene),
         Name::new("GLB Model - Iron Cube"),
         Transform::from_xyz(-1.25, -0.4347, 3.25).with_scale(Vec3::splat(0.5)),
     ));
 
-    let salo_scene: Handle<Scene> = asset_server.load("models/salo.glb#Scene0");
+    let salo_scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/salo.glb"));
     commands.spawn((
-        SceneRoot(salo_scene),
+        WorldAssetRoot(salo_scene),
         Name::new("GLB Model - Salo"),
         Transform::from_xyz(1.25, 0.5, 3.25).with_scale(Vec3::splat(0.5)),
     ));
