@@ -113,13 +113,13 @@ fn spawn_player(mut commands: Commands) {
             CameraPitch::default(),
             AmbientLight {
                 color: Color::srgb(0.42, 0.50, 0.66),
-                brightness: 22.0,
+                brightness: 180.0,
                 ..default()
             },
             SpotLight {
                 color: Color::srgb(0.78, 0.86, 1.0),
-                intensity: 1_600.0,
-                range: 18.0,
+                intensity: 5_000.0,
+                range: 24.0,
                 radius: 0.08,
                 inner_angle: 0.18,
                 outer_angle: 0.42,
@@ -129,7 +129,7 @@ fn spawn_player(mut commands: Commands) {
             Flashlight { enabled: true },
             DistanceFog {
                 color: Color::srgb(0.035, 0.045, 0.065),
-                falloff: FogFalloff::Exponential { density: 0.018 },
+                falloff: FogFalloff::Exponential { density: 0.008 },
                 ..default()
             },
         ));
