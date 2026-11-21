@@ -29,7 +29,7 @@ impl Plugin for PlayerPlugin {
                     update_camera_look,
                     toggle_flashlight,
                 )
-                .chain()
+                    .chain()
                     .after(InputSystems),
             )
             .add_systems(FixedUpdate, move_player);
