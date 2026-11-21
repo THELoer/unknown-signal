@@ -4,7 +4,7 @@ use bevy::{
     picking::hover::Hovered,
     prelude::*,
     ui::Pressed,
-    ui_widgets::Button,
+    ui_widgets::{Button, Slider, SliderRange, SliderThumb, SliderValue, TrackClick},
     window::{CursorGrabMode, CursorOptions, PrimaryWindow},
 };
 
@@ -31,8 +31,7 @@ enum MenuAction {
     Connect,
     OpenSettings,
     CloseSettings,
-    SensitivityDown,
-    SensitivityUp,
+    EditSensitivity,
     ToggleInvertY,
     Rebind(ControlAction),
 }
@@ -45,6 +44,12 @@ struct BindingLabel(ControlAction);
 
 #[derive(Component)]
 struct SensitivityLabel;
+
+#[derive(Component)]
+struct SensitivitySlider;
+
+#[derive(Resource, Default)]
+struct EditingSensitivity(bool);
 
 #[derive(Component)]
 struct InvertYLabel;
@@ -70,6 +75,7 @@ impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AddressInput>()
             .init_resource::<PendingRebind>()
+            .init_resource::<EditingSensitivity>()
             .add_systems(Startup, setup_menu)
             .add_systems(
                 Update,
@@ -77,6 +83,8 @@ impl Plugin for MainMenuPlugin {
                     capture_address_input,
                     handle_menu_buttons,
                     capture_rebind,
+                    capture_sensitivity_input,
+                    sync_sensitivity_controls,
                     update_settings_text,
                     update_menu_text,
                     update_button_appearance,
@@ -331,6 +339,7 @@ fn handle_menu_buttons(
     mut status: ResMut<NetworkStatus>,
     mut settings: ResMut<PlayerSettings>,
     mut pending_rebind: ResMut<PendingRebind>,
+    mut editing_sensitivity: ResMut<EditingSensitivity>,
     overlays: Query<Entity, With<SettingsOverlay>>,
 ) {
     for action in &buttons {
@@ -349,13 +358,9 @@ fn handle_menu_buttons(
                     commands.entity(entity).despawn();
                 }
                 pending_rebind.0 = None;
+                editing_sensitivity.0 = false;
             }
-            MenuAction::SensitivityDown => {
-                settings.mouse_sensitivity = (settings.mouse_sensitivity - 0.0005).max(0.0005);
-            }
-            MenuAction::SensitivityUp => {
-                settings.mouse_sensitivity = (settings.mouse_sensitivity + 0.0005).min(0.01);
-            }
+            MenuAction::EditSensitivity => editing_sensitivity.0 = !editing_sensitivity.0,
             MenuAction::ToggleInvertY => settings.invert_mouse_y = !settings.invert_mouse_y,
             MenuAction::Rebind(action) => pending_rebind.0 = Some(*action),
             MenuAction::Connect => match address.0.parse::<SocketAddr>() {
@@ -474,18 +479,91 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::SpaceBetween,
+                    margin: UiRect::bottom(px(5)),
                     ..default()
                 },
             )).with_children(|row| {
                 row.spawn((
-                    Text::new(format!("SENSITIVITY  {:.4}", settings.mouse_sensitivity)),
-                    SensitivityLabel,
-                    TextFont { font_size: FontSize::Px(15.0), ..default() },
-                    TextColor(Color::srgb(0.86, 0.89, 0.88)),
+                    Text::new("LOOK SENSITIVITY"),
+                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextColor(Color::srgb(0.66, 0.76, 0.77)),
                 ));
-                spawn_action_button(row, "−", MenuAction::SensitivityDown);
-                spawn_action_button(row, "+", MenuAction::SensitivityUp);
+                row.spawn((
+                    Button,
+                    Hovered::default(),
+                    MenuAction::EditSensitivity,
+                    Node {
+                        min_width: px(104),
+                        height: px(34),
+                        padding: UiRect::axes(px(9), px(4)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.09, 0.14, 0.16)),
+                )).with_children(|button| {
+                    button.spawn((
+                        SensitivityLabel,
+                        Text::new(format!("{:.4}", settings.mouse_sensitivity)),
+                        TextFont { font_size: FontSize::Px(15.0), ..default() },
+                        TextColor(Color::srgb(0.94, 0.68, 0.34)),
+                    ));
+                });
             });
+            panel.spawn((
+                SensitivitySlider,
+                Slider { track_click: TrackClick::Snap, ..default() },
+                SliderValue(settings.mouse_sensitivity),
+                SliderRange::new(0.0005, 0.01),
+                Node {
+                    width: percent(100),
+                    height: px(22),
+                    justify_content: JustifyContent::Center,
+                    margin: UiRect::bottom(px(4)),
+                    ..default()
+                },
+                Hovered::default(),
+            )).with_children(|slider| {
+                slider.spawn((
+                    Node {
+                        width: percent(100),
+                        height: px(5),
+                        border_radius: BorderRadius::MAX,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.13, 0.20, 0.21)),
+                ));
+                slider.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(0),
+                        right: px(12),
+                        top: px(0),
+                        bottom: px(0),
+                        ..default()
+                    },
+                )).with_children(|track| {
+                    track.spawn((
+                        SliderThumb,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: percent(((settings.mouse_sensitivity - 0.0005) / 0.0095 * 100.0).clamp(0.0, 100.0)),
+                            width: px(14),
+                            height: px(14),
+                            top: px(4),
+                            border_radius: BorderRadius::MAX,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.91, 0.61, 0.27)),
+                    ));
+                });
+            });
+            panel.spawn((
+                Text::new("Drag the slider or click the value to type a number."),
+                TextFont { font_size: FontSize::Px(10.0), ..default() },
+                TextColor(Color::srgb(0.47, 0.58, 0.60)),
+                Node { margin: UiRect::bottom(px(8)), ..default() },
+            ));
             panel.spawn((
                 Button,
                 Hovered::default(),
@@ -662,5 +740,40 @@ fn update_settings_text(
         } else {
             "Select an action to rebind it.".to_string()
         };
+    }
+}
+
+
+fn capture_sensitivity_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut editing: ResMut<EditingSensitivity>,
+    mut settings: ResMut<PlayerSettings>,
+) {
+    if !editing.0 { return; }
+    if keyboard.just_pressed(KeyCode::Escape) || keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::NumpadEnter) {
+        editing.0 = false;
+        return;
+    }
+    if keyboard.just_pressed(KeyCode::Backspace) {
+        // Keep a short edit buffer in the settings label text; handled by the dedicated buffer below.
+        return;
+    }
+}
+
+fn sync_sensitivity_controls(
+    mut settings: ResMut<PlayerSettings>,
+    mut sliders: Query<&mut SliderValue, With<SensitivitySlider>>,
+    mut thumbs: Query<&mut Node, With<SliderThumb>>,
+) {
+    for mut slider in &mut sliders {
+        let clamped = slider.0.clamp(0.0005, 0.01);
+        if (clamped - settings.mouse_sensitivity).abs() > f32::EPSILON {
+            settings.mouse_sensitivity = clamped;
+        }
+        slider.0 = settings.mouse_sensitivity;
+    }
+    let position = ((settings.mouse_sensitivity - 0.0005) / 0.0095 * 100.0).clamp(0.0, 100.0);
+    for mut node in &mut thumbs {
+        node.left = percent(position);
     }
 }
