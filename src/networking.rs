@@ -16,7 +16,7 @@ const TICK_RATE: f64 = 64.0;
 
 /// The server currently owns the session simulation. Keep this value aligned
 /// with the fixed simulation rate used by the gameplay systems.
-#[derive(Clone, Copy, Debug)]
+#[derive(Resource, Clone, Copy, Debug)]
 pub struct NetworkConfig {
     pub bind_addr: SocketAddr,
     pub tick_rate: f64,
