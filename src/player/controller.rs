@@ -215,15 +215,16 @@ fn spawn_player(mut commands: Commands) {
             },
             SpotLight {
                 color: Color::srgb(0.78, 0.86, 1.0),
-                intensity: 5_000.0,
-                range: 24.0,
-                radius: 0.08,
-                inner_angle: 0.18,
-                outer_angle: 0.42,
-                shadow_maps_enabled: false,
+                // Start disabled; F enables the cone at a clearly visible intensity.
+                intensity: 0.0,
+                range: 32.0,
+                radius: 0.04,
+                inner_angle: 0.22,
+                outer_angle: 0.58,
+                shadow_maps_enabled: true,
                 ..default()
             },
-            Flashlight { enabled: true },
+            Flashlight { enabled: false },
             DistanceFog {
                 color: Color::srgb(0.035, 0.045, 0.065),
                 falloff: FogFalloff::Linear {
@@ -448,7 +449,7 @@ fn toggle_flashlight(
 
     for (mut light, mut flashlight) in &mut flashlights {
         flashlight.enabled = !flashlight.enabled;
-        light.intensity = if flashlight.enabled { 1_600.0 } else { 0.0 };
+        light.intensity = if flashlight.enabled { 30_000.0 } else { 0.0 };
         info!(
             "Flashlight {}",
             if flashlight.enabled { "on" } else { "off" }
