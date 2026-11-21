@@ -15,12 +15,16 @@ pub(super) const EYE_HEIGHT: f32 = 0.55;
 const MOUSE_SENSITIVITY: f32 = 0.0030;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.05;
 
+#[derive(Resource, Default)]
+pub struct GameplayActive(pub bool);
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>()
-            .add_systems(Startup, (spawn_player, lock_cursor))
+            .init_resource::<GameplayActive>()
+            .add_systems(Startup, spawn_player)
             .add_systems(
                 PreUpdate,
                 (
@@ -139,17 +143,16 @@ fn spawn_player(mut commands: Commands) {
     );
 }
 
-fn lock_cursor(mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>) {
-    for mut cursor in &mut windows {
-        cursor.grab_mode = CursorGrabMode::Locked;
-        cursor.visible = false;
-    }
-}
-
 fn capture_player_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    active: Res<GameplayActive>,
     mut player_input: ResMut<PlayerInput>,
 ) {
+    if !active.0 {
+        *player_input = PlayerInput::default();
+        return;
+    }
+
     let horizontal =
         (keyboard.pressed(KeyCode::KeyD) as i8) - (keyboard.pressed(KeyCode::KeyA) as i8);
     let vertical =
@@ -166,26 +169,30 @@ fn capture_player_input(
 
 fn handle_cursor(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mouse: Res<ButtonInput<MouseButton>>,
+    active: Res<GameplayActive>,
     mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
+    if !active.0 || !keyboard.just_pressed(KeyCode::Escape) {
+        return;
+    }
+
     for mut cursor in &mut windows {
-        if keyboard.just_pressed(KeyCode::Escape) {
-            cursor.grab_mode = CursorGrabMode::None;
-            cursor.visible = true;
-        } else if mouse.just_pressed(MouseButton::Left) {
-            cursor.grab_mode = CursorGrabMode::Locked;
-            cursor.visible = false;
-        }
+        cursor.grab_mode = CursorGrabMode::None;
+        cursor.visible = true;
     }
 }
 
 fn update_camera_look(
     mouse_motion: Res<AccumulatedMouseMotion>,
     windows: Query<&CursorOptions, With<PrimaryWindow>>,
+    active: Res<GameplayActive>,
     mut players: Query<&mut Transform, (With<Player>, Without<PlayerCamera>)>,
     mut cameras: Query<(&mut Transform, &mut CameraPitch), (With<PlayerCamera>, Without<Player>)>,
 ) {
+    if !active.0 {
+        return;
+    }
+
     let cursor_locked = windows
         .iter()
         .any(|cursor| cursor.grab_mode == CursorGrabMode::Locked);
@@ -210,6 +217,7 @@ fn update_camera_look(
 fn move_player(
     mut commands: Commands,
     time: Res<Time>,
+    active: Res<GameplayActive>,
     mut player_input: ResMut<PlayerInput>,
     mut players: Query<
         (
@@ -223,6 +231,10 @@ fn move_player(
     >,
     move_and_slide: MoveAndSlide,
 ) {
+    if !active.0 {
+        return;
+    }
+
     let delta = time.delta_secs();
 
     for (entity, mut transform, mut velocity, mut stance, settings) in &mut players {
@@ -329,9 +341,10 @@ fn move_player(
 
 fn toggle_flashlight(
     keyboard: Res<ButtonInput<KeyCode>>,
+    active: Res<GameplayActive>,
     mut flashlights: Query<(&mut SpotLight, &mut Flashlight), With<PlayerCamera>>,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyF) {
+    if !active.0 || !keyboard.just_pressed(KeyCode::KeyF) {
         return;
     }
 
