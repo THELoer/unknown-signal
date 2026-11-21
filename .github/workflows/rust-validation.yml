@@ -1,0 +1,42 @@
+name: Rust Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Format, compile and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes pkg-config libasound2-dev libudev-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libwayland-dev libxkbcommon-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Compile
+        run: cargo check --locked
+
+      - name: Run tests
+        run: cargo test --locked
