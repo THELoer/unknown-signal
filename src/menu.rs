@@ -278,8 +278,9 @@ fn capture_address_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut address: ResMut<AddressInput>,
     menu: Query<(), With<MenuRoot>>,
+    overlays: Query<(), With<SettingsOverlay>>,
 ) {
-    if menu.is_empty() {
+    if menu.is_empty() || !overlays.is_empty() {
         return;
     }
 
@@ -485,17 +486,27 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                 spawn_action_button(row, "−", MenuAction::SensitivityDown);
                 spawn_action_button(row, "+", MenuAction::SensitivityUp);
             });
-            spawn_action_button(
-                panel,
-                if settings.invert_mouse_y { "INVERT Y: ON" } else { "INVERT Y: OFF" },
-                MenuAction::ToggleInvertY,
-            );
             panel.spawn((
-                InvertYLabel,
-                Text::new(""),
-                TextFont { font_size: FontSize::Px(1.0), ..default() },
-                TextColor(Color::srgb(0.86, 0.89, 0.88)),
-            ));
+                Button,
+                Hovered::default(),
+                MenuAction::ToggleInvertY,
+                Node {
+                    width: percent(100),
+                    min_height: px(34),
+                    padding: UiRect::axes(px(10), px(5)),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.14, 0.21, 0.23)),
+            )).with_children(|button| {
+                button.spawn((
+                    InvertYLabel,
+                    Text::new(if settings.invert_mouse_y { "INVERT Y: ON" } else { "INVERT Y: OFF" }),
+                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextColor(Color::srgb(0.88, 0.91, 0.89)),
+                ));
+            });
             panel.spawn((
                 Text::new("KEYBOARD"),
                 TextFont { font_size: FontSize::Px(14.0), ..default() },
