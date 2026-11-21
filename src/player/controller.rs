@@ -21,8 +21,12 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>()
             .add_systems(Startup, (spawn_player, lock_cursor))
-            .add_systems(PreUpdate, capture_player_input.after(InputSystems))
-            .add_systems(Update, (handle_cursor, update_camera_look).chain())
+            .add_systems(
+                PreUpdate,
+                (handle_cursor, capture_player_input, update_camera_look, toggle_flashlight)
+                    .chain()
+                    .after(InputSystems),
+            )
             .add_systems(FixedUpdate, move_player);
     }
 }
@@ -40,6 +44,11 @@ pub(super) struct PlayerCamera;
 
 #[derive(Component, Default)]
 pub(super) struct CameraPitch(pub(super) f32);
+
+#[derive(Component)]
+struct Flashlight {
+    enabled: bool,
+}
 
 #[derive(Component, Default)]
 struct PlayerStance {
@@ -87,7 +96,7 @@ fn spawn_player(mut commands: Commands) {
             PlayerMovementSettings::default(),
             Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH),
             LinearVelocity::default(),
-            TransformInterpolation,
+            TranslationInterpolation,
             Visibility::default(),
             InheritedVisibility::default(),
             Transform::from_xyz(0.0, 1.0, 5.0),
@@ -97,6 +106,22 @@ fn spawn_player(mut commands: Commands) {
             Transform::from_xyz(0.0, EYE_HEIGHT, 0.0),
             PlayerCamera,
             CameraPitch::default(),
+            SpotLight {
+                color: Color::srgb(0.78, 0.86, 1.0),
+                intensity: 1_600.0,
+                range: 18.0,
+                radius: 0.08,
+                inner_angle: 0.18,
+                outer_angle: 0.42,
+                shadow_maps_enabled: false,
+                ..default()
+            },
+            Flashlight { enabled: true },
+            DistanceFog {
+                color: Color::srgb(0.035, 0.045, 0.065),
+                falloff: FogFalloff::Exponential { density: 0.018 },
+                ..default()
+            },
         ));
 
     info!(
@@ -280,4 +305,22 @@ fn move_player(
 
     // Consume the edge-triggered jump input once, even if FixedUpdate runs multiple times.
     player_input.jump_pressed = false;
+}
+
+fn toggle_flashlight(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut flashlights: Query<(&mut SpotLight, &mut Flashlight), With<PlayerCamera>>,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyF) {
+        return;
+    }
+
+    for (mut light, mut flashlight) in &mut flashlights {
+        flashlight.enabled = !flashlight.enabled;
+        light.intensity = if flashlight.enabled { 1_600.0 } else { 0.0 };
+        info!(
+            "Flashlight {}",
+            if flashlight.enabled { "on" } else { "off" }
+        );
+    }
 }
