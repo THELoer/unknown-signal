@@ -1,0 +1,9 @@
+[package]
+name = "lethal-like-game"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+avian = "0.0.1"
+bevy = "0.20.1"
+lightyear = "0.31.0"
