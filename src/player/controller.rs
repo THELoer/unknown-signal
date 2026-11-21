@@ -2,7 +2,9 @@ use std::f32::consts::FRAC_PI_2;
 
 use avian3d::{math::*, prelude::*};
 use bevy::{
+    camera::Hdr,
     input::{InputSystems, mouse::AccumulatedMouseMotion},
+    post_process::effect_stack::{ChromaticAberration, Vignette},
     prelude::*,
     window::{CursorGrabMode, CursorOptions, PrimaryWindow},
 };
@@ -188,12 +190,25 @@ fn spawn_player(mut commands: Commands) {
         ))
         .with_child((
             Camera3d::default(),
+            Hdr,
+            ChromaticAberration {
+                intensity: 0.004,
+                max_samples: 8,
+                ..default()
+            },
+            Vignette {
+                intensity: 0.28,
+                radius: 0.82,
+                smoothness: 0.72,
+                roundness: 1.0,
+                edge_compensation: 0.0,
+            },
             Transform::from_xyz(0.0, EYE_HEIGHT, 0.0),
             PlayerCamera,
             CameraPitch::default(),
             AmbientLight {
                 color: Color::srgb(0.42, 0.50, 0.66),
-                brightness: 180.0,
+                brightness: 95.0,
                 ..default()
             },
             SpotLight {
@@ -209,7 +224,10 @@ fn spawn_player(mut commands: Commands) {
             Flashlight { enabled: true },
             DistanceFog {
                 color: Color::srgb(0.035, 0.045, 0.065),
-                falloff: FogFalloff::Exponential { density: 0.008 },
+                falloff: FogFalloff::Linear {
+                    start: 9.0,
+                    end: 34.0,
+                },
                 ..default()
             },
         ));
