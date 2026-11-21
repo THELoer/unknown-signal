@@ -106,6 +106,11 @@ fn spawn_player(mut commands: Commands) {
             Transform::from_xyz(0.0, EYE_HEIGHT, 0.0),
             PlayerCamera,
             CameraPitch::default(),
+            AmbientLight {
+                color: Color::srgb(0.42, 0.50, 0.66),
+                brightness: 22.0,
+                ..default()
+            },
             SpotLight {
                 color: Color::srgb(0.78, 0.86, 1.0),
                 intensity: 1_600.0,
