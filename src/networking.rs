@@ -53,7 +53,7 @@ pub struct NetworkStatus {
     pub mode: Option<NetworkMode>,
     /// Number of remote server-side links currently marked Connected.
     pub peer_count: usize,
-    /// Most recent connection error reported by the networking layer.
+    /// Most recent local disconnect/error summary.
     pub last_error: Option<String>,
     requested: bool,
     session_entities: Vec<Entity>,
@@ -252,7 +252,7 @@ fn monitor_connection(
 
 fn update_network_diagnostics(
     clients: Query<(), (With<Client>, With<Connected>)>,
-    server_peers: Query<(), (With<LinkOf>, With<Connected>)>,
+    server_peers: Query<(), (With<LinkOf>, With<Connected>, Without<HostClient>)>,
     remote_players: Query<(), (With<Remote>, With<RemotePlayerVisual>)>,
     mut diagnostics: ResMut<NetworkDiagnostics>,
 ) {
