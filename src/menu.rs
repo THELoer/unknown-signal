@@ -10,7 +10,7 @@ use bevy::{
 
 use crate::{
     networking::{NetworkRequest, NetworkStatus, PendingNetworkRequest},
-    player::controller::GameplayActive,
+    player::GameplayActive,
 };
 
 #[derive(Component)]
@@ -139,7 +139,7 @@ fn setup_menu(
                     BackgroundColor(Color::srgb(0.07, 0.09, 0.10)),
                 ));
                 panel.spawn((
-                    Text::new("Click Connect, then type digits, '.' or ':' to edit the address. Backspace deletes."),
+                    Text::new("Edit address with Backspace, digits, '.' and ':', then connect."),
                     TextFont {
                         font_size: FontSize::Px(11.0),
                         ..default()
