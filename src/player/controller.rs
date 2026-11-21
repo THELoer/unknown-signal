@@ -113,10 +113,10 @@ fn capture_player_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut player_input: ResMut<PlayerInput>,
 ) {
-    let horizontal = i8::from(keyboard.pressed(KeyCode::KeyD))
-        - i8::from(keyboard.pressed(KeyCode::KeyA));
-    let vertical = i8::from(keyboard.pressed(KeyCode::KeyW))
-        - i8::from(keyboard.pressed(KeyCode::KeyS));
+    let horizontal = (keyboard.pressed(KeyCode::KeyD) as i8)
+        - (keyboard.pressed(KeyCode::KeyA) as i8);
+    let vertical = (keyboard.pressed(KeyCode::KeyW) as i8)
+        - (keyboard.pressed(KeyCode::KeyS) as i8);
 
     player_input.movement =
         Vec2::new(horizontal as f32, vertical as f32).clamp_length_max(1.0);
