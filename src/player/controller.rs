@@ -273,11 +273,11 @@ fn move_player(
             };
 
         // Probe just below the capsule's feet so a jump is only possible while grounded.
-        let foot_origin = transform.translation - Vec3::Y * (half_height - 0.08);
+        let foot_origin = transform.translation - Vec3::Y * (half_height - 0.05);
         let filter = SpatialQueryFilter::from_excluded_entities([entity]);
         let grounded = move_and_slide
             .spatial_query
-            .cast_ray(foot_origin, Dir3::NEG_Y, 0.16, true, &filter)
+            .cast_ray(foot_origin, Dir3::NEG_Y, 0.25, true, &filter)
             .is_some();
 
         if grounded && velocity.y < 0.0 {
