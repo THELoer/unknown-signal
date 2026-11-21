@@ -88,6 +88,8 @@ fn spawn_player(mut commands: Commands) {
             Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH),
             LinearVelocity::default(),
             TransformInterpolation,
+            Visibility::default(),
+            InheritedVisibility::default(),
             Transform::from_xyz(0.0, 1.0, 5.0),
         ))
         .with_child((
@@ -171,6 +173,7 @@ fn update_camera_look(
 }
 
 fn move_player(
+    mut commands: Commands,
     time: Res<Time>,
     mut player_input: ResMut<PlayerInput>,
     mut players: Query<
@@ -178,27 +181,25 @@ fn move_player(
             Entity,
             &mut Transform,
             &mut LinearVelocity,
-            &mut Collider,
             &mut PlayerStance,
             &PlayerMovementSettings,
         ),
         With<Player>,
     >,
-    spatial_query: SpatialQuery,
     move_and_slide: MoveAndSlide,
 ) {
     let delta = time.delta_secs();
 
-    for (entity, mut transform, mut velocity, mut collider, mut stance, settings) in &mut players {
+    for (entity, mut transform, mut velocity, mut stance, settings) in &mut players {
         // Resize the capsule while keeping the player's feet at the same height.
         if player_input.crouch && !stance.crouched {
             transform.translation.y -= STANCE_HEIGHT_DELTA;
-            *collider = Collider::capsule(PLAYER_RADIUS, CROUCHED_CAPSULE_LENGTH);
+            commands.entity(entity).insert(Collider::capsule(PLAYER_RADIUS, CROUCHED_CAPSULE_LENGTH));
             stance.crouched = true;
         } else if !player_input.crouch && stance.crouched {
             let crouched_half_height = PLAYER_RADIUS + CROUCHED_CAPSULE_LENGTH * 0.5;
             let head_origin = transform.translation + Vec3::Y * (crouched_half_height - 0.02);
-            let blocked = spatial_query
+            let blocked = move_and_slide.spatial_query
                 .cast_ray(
                     head_origin,
                     Dir3::Y,
@@ -210,10 +211,15 @@ fn move_player(
 
             if !blocked {
                 transform.translation.y += STANCE_HEIGHT_DELTA;
-                *collider = Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH);
+                commands.entity(entity).insert(Collider::capsule(PLAYER_RADIUS, STANDING_CAPSULE_LENGTH));
                 stance.crouched = false;
             }
         }
+
+        let collider = Collider::capsule(
+            PLAYER_RADIUS,
+            if stance.crouched { CROUCHED_CAPSULE_LENGTH } else { STANDING_CAPSULE_LENGTH },
+        );
 
         let half_height = PLAYER_RADIUS
             + if stance.crouched {
@@ -225,7 +231,7 @@ fn move_player(
         // Probe just below the capsule's feet so a jump is only possible while grounded.
         let foot_origin = transform.translation - Vec3::Y * (half_height - 0.08);
         let filter = SpatialQueryFilter::from_excluded_entities([entity]);
-        let grounded = spatial_query
+        let grounded = move_and_slide.spatial_query
             .cast_ray(foot_origin, Dir3::NEG_Y, 0.16, true, &filter)
             .is_some();
 
