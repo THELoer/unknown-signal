@@ -6,7 +6,11 @@ use bevy::prelude::*;
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
-        .add_plugins((WorldScenePlugin, player::PlayerPlugin, player::InteractionPlugin))
+        .add_plugins((
+            WorldScenePlugin,
+            player::PlayerPlugin,
+            player::InteractionPlugin,
+        ))
         .run();
 }
 
@@ -70,44 +74,184 @@ fn spawn_test_scene(
     });
 
     // Main room: 16 x 16 metres, with a low industrial ceiling.
-    spawn_box(&mut commands, cube.clone(), floor.clone(), Vec3::new(16.0, 0.2, 16.0), Vec3::new(0.0, -0.1, 0.0), true);
-    spawn_box(&mut commands, cube.clone(), wall.clone(), Vec3::new(16.0, 5.0, 0.25), Vec3::new(0.0, 2.5, -8.0), true);
-    spawn_box(&mut commands, cube.clone(), wall.clone(), Vec3::new(16.0, 5.0, 0.25), Vec3::new(0.0, 2.5, 8.0), true);
-    spawn_box(&mut commands, cube.clone(), wall.clone(), Vec3::new(0.25, 5.0, 16.0), Vec3::new(-8.0, 2.5, 0.0), true);
-    spawn_box(&mut commands, cube.clone(), wall.clone(), Vec3::new(0.25, 5.0, 16.0), Vec3::new(8.0, 2.5, 0.0), true);
-    spawn_box(&mut commands, cube.clone(), trim.clone(), Vec3::new(16.0, 0.22, 16.0), Vec3::new(0.0, 5.0, 0.0), true);
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        floor.clone(),
+        Vec3::new(16.0, 0.2, 16.0),
+        Vec3::new(0.0, -0.1, 0.0),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        wall.clone(),
+        Vec3::new(16.0, 5.0, 0.25),
+        Vec3::new(0.0, 2.5, -8.0),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        wall.clone(),
+        Vec3::new(16.0, 5.0, 0.25),
+        Vec3::new(0.0, 2.5, 8.0),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        wall.clone(),
+        Vec3::new(0.25, 5.0, 16.0),
+        Vec3::new(-8.0, 2.5, 0.0),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        wall.clone(),
+        Vec3::new(0.25, 5.0, 16.0),
+        Vec3::new(8.0, 2.5, 0.0),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        trim.clone(),
+        Vec3::new(16.0, 0.22, 16.0),
+        Vec3::new(0.0, 5.0, 0.0),
+        true,
+    );
 
     // A partition wall makes the door a real passage instead of a floating prop.
-    spawn_box(&mut commands, cube.clone(), wall.clone(), Vec3::new(7.0, 5.0, 0.25), Vec3::new(-4.5, 2.5, 2.5), true);
-    spawn_box(&mut commands, cube.clone(), wall.clone(), Vec3::new(7.0, 5.0, 0.25), Vec3::new(4.5, 2.5, 2.5), true);
-    spawn_box(&mut commands, cube.clone(), wall.clone(), Vec3::new(2.0, 2.7, 0.25), Vec3::new(0.0, 3.65, 2.5), true);
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        wall.clone(),
+        Vec3::new(7.0, 5.0, 0.25),
+        Vec3::new(-4.5, 2.5, 2.5),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        wall.clone(),
+        Vec3::new(7.0, 5.0, 0.25),
+        Vec3::new(4.5, 2.5, 2.5),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        wall.clone(),
+        Vec3::new(2.0, 2.7, 0.25),
+        Vec3::new(0.0, 3.65, 2.5),
+        true,
+    );
 
     // Heavy structural ribs and wall-mounted service panels.
     for z in [-6.0, -2.0, 2.0, 6.0] {
-        spawn_box(&mut commands, cube.clone(), trim.clone(), Vec3::new(16.0, 0.16, 0.20), Vec3::new(0.0, 4.78, z), false);
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        trim.clone(),
+        Vec3::new(16.0, 0.16, 0.20),
+        Vec3::new(0.0, 4.78, z),
+        false,
+    );
     }
     for x in [-7.65, -4.0, 4.0, 7.65] {
-        spawn_box(&mut commands, cube.clone(), trim.clone(), Vec3::new(0.16, 4.8, 0.28), Vec3::new(x, 2.5, -7.82), false);
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        trim.clone(),
+        Vec3::new(0.16, 4.8, 0.28),
+        Vec3::new(x, 2.5, -7.82),
+        false,
+    );
     }
     for z in [-5.5, -1.5, 4.5] {
-        spawn_box(&mut commands, cube.clone(), panel.clone(), Vec3::new(0.12, 1.35, 1.7), Vec3::new(-7.82, 2.7, z), false);
-        spawn_box(&mut commands, cube.clone(), trim.clone(), Vec3::new(0.14, 0.08, 1.8), Vec3::new(-7.72, 3.38, z), false);
-        spawn_box(&mut commands, cube.clone(), panel.clone(), Vec3::new(0.12, 1.35, 1.7), Vec3::new(7.82, 2.7, z), false);
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        panel.clone(),
+        Vec3::new(0.12, 1.35, 1.7),
+        Vec3::new(-7.82, 2.7, z),
+        false,
+    );
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        trim.clone(),
+        Vec3::new(0.14, 0.08, 1.8),
+        Vec3::new(-7.72, 3.38, z),
+        false,
+    );
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        panel.clone(),
+        Vec3::new(0.12, 1.35, 1.7),
+        Vec3::new(7.82, 2.7, z),
+        false,
+    );
     }
 
     // Yellow safety markings along the room edges and around the doorway.
     for x in [-7.35, 7.35] {
-        spawn_box(&mut commands, cube.clone(), hazard.clone(), Vec3::new(0.07, 0.012, 15.0), Vec3::new(x, 0.012, 0.0), false);
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        hazard.clone(),
+        Vec3::new(0.07, 0.012, 15.0),
+        Vec3::new(x, 0.012, 0.0),
+        false,
+    );
     }
     for x in [-0.95, 0.95] {
-        spawn_box(&mut commands, cube.clone(), hazard.clone(), Vec3::new(0.045, 0.018, 0.55), Vec3::new(x, 0.02, 2.5), false);
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        hazard.clone(),
+        Vec3::new(0.045, 0.018, 0.55),
+        Vec3::new(x, 0.02, 2.5),
+        false,
+    );
     }
 
     // A few chunky equipment crates give the room readable scale.
-    spawn_box(&mut commands, cube.clone(), crate_material.clone(), Vec3::new(1.25, 1.0, 1.0), Vec3::new(-3.2, 0.5, -1.0), true);
-    spawn_box(&mut commands, cube.clone(), trim.clone(), Vec3::new(1.28, 0.10, 1.03), Vec3::new(-3.2, 1.02, -1.0), false);
-    spawn_box(&mut commands, cube.clone(), crate_material.clone(), Vec3::new(0.85, 0.75, 0.85), Vec3::new(3.8, 0.375, -4.8), true);
-    spawn_box(&mut commands, cube.clone(), panel.clone(), Vec3::new(1.0, 0.12, 0.12), Vec3::new(3.8, 0.45, -4.8), false);
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        crate_material.clone(),
+        Vec3::new(1.25, 1.0, 1.0),
+        Vec3::new(-3.2, 0.5, -1.0),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        trim.clone(),
+        Vec3::new(1.28, 0.10, 1.03),
+        Vec3::new(-3.2, 1.02, -1.0),
+        false,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        crate_material.clone(),
+        Vec3::new(0.85, 0.75, 0.85),
+        Vec3::new(3.8, 0.375, -4.8),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        panel.clone(),
+        Vec3::new(1.0, 0.12, 0.12),
+        Vec3::new(3.8, 0.45, -4.8),
+        false,
+    );
 
     // Ceiling fixtures use non-shadow-casting point lights to keep the greybox inexpensive.
     for (x, z, color) in [
@@ -116,7 +260,14 @@ fn spawn_test_scene(
         (-4.5, 4.5, Color::srgb(0.95, 0.70, 0.42)),
         (4.5, 4.5, Color::srgb(0.68, 0.80, 1.0)),
     ] {
-        spawn_box(&mut commands, cube.clone(), lamp_material.clone(), Vec3::new(1.35, 0.08, 0.42), Vec3::new(x, 4.82, z), false);
+        spawn_box(
+        &mut commands,
+        cube.clone(),
+        lamp_material.clone(),
+        Vec3::new(1.35, 0.08, 0.42),
+        Vec3::new(x, 4.82, z),
+        false,
+    );
         commands.spawn((
             PointLight {
                 color,
@@ -131,8 +282,22 @@ fn spawn_test_scene(
     }
 
     // Retain one physics test object, now styled as a low industrial console.
-    spawn_box(&mut commands, cube.clone(), panel.clone(), Vec3::new(1.5, 1.0, 0.8), Vec3::new(0.0, 0.5, -0.2), true);
-    spawn_box(&mut commands, cube.clone(), hazard.clone(), Vec3::new(1.2, 0.045, 0.04), Vec3::new(0.0, 1.02, -0.62), false);
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        panel.clone(),
+        Vec3::new(1.5, 1.0, 0.8),
+        Vec3::new(0.0, 0.5, -0.2),
+        true,
+    );
+    spawn_box(
+        &mut commands,
+        cube.clone(),
+        hazard.clone(),
+        Vec3::new(1.2, 0.045, 0.04),
+        Vec3::new(0.0, 1.02, -0.62),
+        false,
+    );
 
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.55).mesh().uv(24, 12))),
