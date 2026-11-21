@@ -53,7 +53,7 @@ impl Plugin for NetworkPlayersPlugin {
             buffer_local_player_input.in_set(InputSystems::WriteClientInputs),
         )
         .add_systems(FixedUpdate, simulate_authoritative_players)
-        .add_systems(Update, spawn_interpolated_player_visuals)
+        .add_systems(Update, spawn_remote_player_visuals)
         .add_observer(add_input_marker_to_controlled_player)
         .add_observer(spawn_player_for_connected_peer);
     }
