@@ -198,9 +198,7 @@ fn add_replication_sender(
     host_clients: Query<(), With<HostClient>>,
     players: Query<Entity, With<crate::player::Player>>,
 ) {
-    if server_links.get(trigger.entity).is_ok()
-        && host_clients.get(trigger.entity).is_err()
-    {
+    if server_links.get(trigger.entity).is_ok() && host_clients.get(trigger.entity).is_err() {
         commands.entity(trigger.entity).insert(ReplicationSender);
         for player in &players {
             commands
