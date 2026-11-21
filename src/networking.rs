@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use lightyear::connection::server::Start;
-use lightyear::prelude::client::{ClientPlugins, Connect, Remote};
+use lightyear::prelude::client::{ClientPlugins, Connect, RawClient, Remote};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::connection::host::HostClient;
 use lightyear::prelude::{
