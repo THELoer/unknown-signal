@@ -4,7 +4,7 @@ use bevy::{
     picking::hover::Hovered,
     prelude::*,
     ui::Pressed,
-    ui_widgets::{Button, Slider, SliderRange, SliderThumb, SliderValue, TrackClick},
+    ui_widgets::{slider_self_update, Button, Slider, SliderRange, SliderThumb, SliderValue, TrackClick},
     window::{CursorGrabMode, CursorOptions, PrimaryWindow},
 };
 
@@ -80,6 +80,7 @@ impl Plugin for MainMenuPlugin {
             .init_resource::<PendingRebind>()
             .init_resource::<EditingSensitivity>()
             .init_resource::<SensitivityBuffer>()
+            .add_observer(slider_self_update)
             .add_systems(Startup, setup_menu)
             .add_systems(
                 Update,
@@ -372,7 +373,7 @@ fn handle_menu_buttons(
             MenuAction::EditSensitivity => {
                 editing_sensitivity.0 = !editing_sensitivity.0;
                 if editing_sensitivity.0 {
-                    sensitivity_buffer.0 = format!("{:.4}", settings.mouse_sensitivity);
+                    sensitivity_buffer.0 = format!("{:.2}", sensitivity_to_ui(settings.mouse_sensitivity));
                 }
             },
             MenuAction::ToggleInvertY => settings.invert_mouse_y = !settings.invert_mouse_y,
@@ -530,7 +531,7 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                 )).with_children(|button| {
                     button.spawn((
                         SensitivityLabel,
-                        Text::new(format!("{:.4}", settings.mouse_sensitivity)),
+                        Text::new(format!("{:.2}", sensitivity_to_ui(settings.mouse_sensitivity))),
                         TextFont { font_size: FontSize::Px(15.0), ..default() },
                         TextColor(Color::srgb(0.94, 0.68, 0.34)),
                     ));
@@ -539,8 +540,8 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
             panel.spawn((
                 SensitivitySlider,
                 Slider { track_click: TrackClick::Snap, ..default() },
-                SliderValue(settings.mouse_sensitivity),
-                SliderRange::new(0.0005, 0.01),
+                SliderValue(sensitivity_to_ui(settings.mouse_sensitivity)),
+                SliderRange::new(0.0, 1.0),
                 Node {
                     width: percent(100),
                     height: px(22),
@@ -572,7 +573,7 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                         SliderThumb,
                         Node {
                             position_type: PositionType::Absolute,
-                            left: percent(((settings.mouse_sensitivity - 0.0005) / 0.0095 * 100.0).clamp(0.0, 100.0)),
+                            left: percent(sensitivity_to_ui(settings.mouse_sensitivity) * 100.0),
                             width: px(14),
                             height: px(14),
                             top: px(4),
@@ -583,7 +584,7 @@ fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
                 });
             });
             panel.spawn((
-                Text::new("Drag the slider or click the value to type a number."),
+                Text::new("SENSITIVITY  0.00 — 1.00  |  Drag or enter a value."),
                 TextFont { font_size: FontSize::Px(10.0), ..default() },
                 TextColor(Color::srgb(0.47, 0.58, 0.60)),
                 Node { margin: UiRect::bottom(px(8)), ..default() },
@@ -789,7 +790,7 @@ fn capture_sensitivity_input(
     if keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::NumpadEnter) {
         if let Ok(value) = buffer.0.parse::<f32>() {
             if value.is_finite() {
-                settings.mouse_sensitivity = value.clamp(0.0005, 0.01);
+                settings.mouse_sensitivity = sensitivity_from_ui(value.clamp(0.0, 1.0));
             }
         }
         editing.0 = false;
@@ -821,6 +822,18 @@ fn capture_sensitivity_input(
     }
 }
 
+const MIN_MOUSE_SENSITIVITY: f32 = 0.0005;
+const MAX_MOUSE_SENSITIVITY: f32 = 0.01;
+
+fn sensitivity_to_ui(value: f32) -> f32 {
+    ((value - MIN_MOUSE_SENSITIVITY) / (MAX_MOUSE_SENSITIVITY - MIN_MOUSE_SENSITIVITY))
+        .clamp(0.0, 1.0)
+}
+
+fn sensitivity_from_ui(value: f32) -> f32 {
+    MIN_MOUSE_SENSITIVITY + value * (MAX_MOUSE_SENSITIVITY - MIN_MOUSE_SENSITIVITY)
+}
+
 fn sync_sensitivity_controls(
     mut commands: Commands,
     mut settings: ResMut<PlayerSettings>,
@@ -831,14 +844,15 @@ fn sync_sensitivity_controls(
     // SliderValue is immutable in Bevy 0.20: read changes and replace the component
     // when settings are changed from the numeric-entry control.
     for slider in &changed_sliders {
-        settings.mouse_sensitivity = slider.0.clamp(0.0005, 0.01);
+        settings.mouse_sensitivity = sensitivity_from_ui(slider.0.clamp(0.0, 1.0));
     }
     for (entity, slider) in &sliders {
-        if (slider.0 - settings.mouse_sensitivity).abs() > f32::EPSILON {
-            commands.entity(entity).insert(SliderValue(settings.mouse_sensitivity));
+        let ui_value = sensitivity_to_ui(settings.mouse_sensitivity);
+        if (slider.0 - ui_value).abs() > f32::EPSILON {
+            commands.entity(entity).insert(SliderValue(ui_value));
         }
     }
-    let position = ((settings.mouse_sensitivity - 0.0005) / 0.0095 * 100.0).clamp(0.0, 100.0);
+    let position = sensitivity_to_ui(settings.mouse_sensitivity) * 100.0;
     for mut node in &mut thumbs {
         node.left = percent(position);
     }
