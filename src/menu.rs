@@ -66,7 +66,7 @@ fn setup_menu(
         cursor.visible = true;
     }
 
-    commands.spawn(Camera2d);
+    commands.spawn((Camera2d, Camera { order: 10, ..default() }));
     commands
         .spawn((
             MenuRoot,
