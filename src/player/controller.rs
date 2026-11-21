@@ -113,15 +113,14 @@ fn capture_player_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut player_input: ResMut<PlayerInput>,
 ) {
-    let horizontal = (keyboard.pressed(KeyCode::KeyD) as i8)
-        - (keyboard.pressed(KeyCode::KeyA) as i8);
-    let vertical = (keyboard.pressed(KeyCode::KeyW) as i8)
-        - (keyboard.pressed(KeyCode::KeyS) as i8);
+    let horizontal =
+        (keyboard.pressed(KeyCode::KeyD) as i8) - (keyboard.pressed(KeyCode::KeyA) as i8);
+    let vertical =
+        (keyboard.pressed(KeyCode::KeyW) as i8) - (keyboard.pressed(KeyCode::KeyS) as i8);
 
-    player_input.movement =
-        Vec2::new(horizontal as f32, vertical as f32).clamp_length_max(1.0);
-    player_input.sprint = keyboard.pressed(KeyCode::ShiftLeft)
-        || keyboard.pressed(KeyCode::ShiftRight);
+    player_input.movement = Vec2::new(horizontal as f32, vertical as f32).clamp_length_max(1.0);
+    player_input.sprint =
+        keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     player_input.crouch = keyboard.pressed(KeyCode::ControlLeft)
         || keyboard.pressed(KeyCode::ControlRight)
         || keyboard.pressed(KeyCode::KeyC);
@@ -147,8 +146,8 @@ fn handle_cursor(
 fn update_camera_look(
     mouse_motion: Res<AccumulatedMouseMotion>,
     windows: Query<&CursorOptions, With<PrimaryWindow>>,
-    mut players: Query<&mut Transform, With<Player>>,
-    mut cameras: Query<(&mut Transform, &mut CameraPitch), With<PlayerCamera>>,
+    mut players: Query<&mut Transform, (With<Player>, Without<PlayerCamera>)>,
+    mut cameras: Query<(&mut Transform, &mut CameraPitch), (With<PlayerCamera>, Without<Player>)>,
 ) {
     let cursor_locked = windows
         .iter()
@@ -174,22 +173,23 @@ fn update_camera_look(
 fn move_player(
     time: Res<Time>,
     mut player_input: ResMut<PlayerInput>,
-    mut players: Query<(
-        Entity,
-        &mut Transform,
-        &mut LinearVelocity,
-        &mut Collider,
-        &mut PlayerStance,
-        &PlayerMovementSettings,
-    ), With<Player>>,
+    mut players: Query<
+        (
+            Entity,
+            &mut Transform,
+            &mut LinearVelocity,
+            &mut Collider,
+            &mut PlayerStance,
+            &PlayerMovementSettings,
+        ),
+        With<Player>,
+    >,
     spatial_query: SpatialQuery,
     move_and_slide: MoveAndSlide,
 ) {
     let delta = time.delta_secs();
 
-    for (entity, mut transform, mut velocity, mut collider, mut stance, settings) in
-        &mut players
-    {
+    for (entity, mut transform, mut velocity, mut collider, mut stance, settings) in &mut players {
         // Resize the capsule while keeping the player's feet at the same height.
         if player_input.crouch && !stance.crouched {
             transform.translation.y -= STANCE_HEIGHT_DELTA;
@@ -197,8 +197,7 @@ fn move_player(
             stance.crouched = true;
         } else if !player_input.crouch && stance.crouched {
             let crouched_half_height = PLAYER_RADIUS + CROUCHED_CAPSULE_LENGTH * 0.5;
-            let head_origin = transform.translation
-                + Vec3::Y * (crouched_half_height - 0.02);
+            let head_origin = transform.translation + Vec3::Y * (crouched_half_height - 0.02);
             let blocked = spatial_query
                 .cast_ray(
                     head_origin,
@@ -233,8 +232,7 @@ fn move_player(
         if grounded && velocity.y < 0.0 {
             velocity.y = 0.0;
         } else {
-            velocity.y = (velocity.y - settings.gravity * delta)
-                .max(-settings.terminal_velocity);
+            velocity.y = (velocity.y - settings.gravity * delta).max(-settings.terminal_velocity);
         }
 
         if player_input.jump_pressed && grounded {
@@ -243,9 +241,8 @@ fn move_player(
 
         let forward = *transform.forward();
         let right = *transform.right();
-        let wish_direction =
-            (right * player_input.movement.x + forward * player_input.movement.y)
-                .normalize_or_zero();
+        let wish_direction = (right * player_input.movement.x + forward * player_input.movement.y)
+            .normalize_or_zero();
 
         let max_speed = if stance.crouched {
             settings.crouch_speed
