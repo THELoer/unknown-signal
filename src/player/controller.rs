@@ -213,9 +213,20 @@ fn spawn_player(mut commands: Commands) {
                 brightness: 95.0,
                 ..default()
             },
+            DistanceFog {
+                color: Color::srgb(0.035, 0.045, 0.065),
+                falloff: FogFalloff::Linear {
+                    start: 9.0,
+                    end: 34.0,
+                },
+                ..default()
+            },
+        ))
+        // Keep the spotlight on its own entity: Bevy warns that sharing an entity
+        // with Camera replaces the camera frustum with the spotlight frustum.
+        .with_child((
             SpotLight {
                 color: Color::srgb(0.78, 0.86, 1.0),
-                // Start disabled; F enables the cone at a clearly visible intensity.
                 intensity: 0.0,
                 range: 32.0,
                 radius: 0.04,
@@ -225,14 +236,7 @@ fn spawn_player(mut commands: Commands) {
                 ..default()
             },
             Flashlight { enabled: false },
-            DistanceFog {
-                color: Color::srgb(0.035, 0.045, 0.065),
-                falloff: FogFalloff::Linear {
-                    start: 9.0,
-                    end: 34.0,
-                },
-                ..default()
-            },
+            Transform::default(),
         ));
 
     info!(
@@ -441,7 +445,7 @@ fn toggle_flashlight(
     settings: Res<PlayerSettings>,
     keyboard: Res<ButtonInput<KeyCode>>,
     active: Res<GameplayActive>,
-    mut flashlights: Query<(&mut SpotLight, &mut Flashlight), With<PlayerCamera>>,
+    mut flashlights: Query<(&mut SpotLight, &mut Flashlight)>,
 ) {
     if !active.0 || !keyboard.just_pressed(settings.flashlight) {
         return;
