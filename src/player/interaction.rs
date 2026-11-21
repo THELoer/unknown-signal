@@ -184,6 +184,7 @@ fn spawn_frame_piece(
 
 fn interact_with_door(
     mut commands: Commands,
+    active: Res<GameplayActive>,
     keyboard: Res<ButtonInput<KeyCode>>,
     players: Query<Entity, With<Player>>,
     cameras: Query<(Entity, &GlobalTransform), With<PlayerCamera>>,
@@ -193,7 +194,7 @@ fn interact_with_door(
     spatial_query: SpatialQuery,
     mut held_item: ResMut<HeldItem>,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyE) {
+    if !active.0 || !keyboard.just_pressed(KeyCode::KeyE) {
         return;
     }
 
