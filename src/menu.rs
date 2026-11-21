@@ -10,7 +10,7 @@ use bevy::{
 
 use crate::{
     networking::{NetworkRequest, NetworkStatus, PendingNetworkRequest},
-    player::GameplayActive,
+    player::{ControlAction, GameplayActive, PlayerSettings},
 };
 
 #[derive(Component)]
@@ -29,7 +29,31 @@ struct AddressText;
 enum MenuAction {
     Host,
     Connect,
+    OpenSettings,
+    CloseSettings,
+    SensitivityDown,
+    SensitivityUp,
+    ToggleInvertY,
+    Rebind(ControlAction),
 }
+
+#[derive(Component)]
+struct SettingsOverlay;
+
+#[derive(Component, Clone, Copy)]
+struct BindingLabel(ControlAction);
+
+#[derive(Component)]
+struct SensitivityLabel;
+
+#[derive(Component)]
+struct InvertYLabel;
+
+#[derive(Component)]
+struct RebindHint;
+
+#[derive(Resource, Default)]
+struct PendingRebind(Option<ControlAction>);
 
 #[derive(Resource)]
 struct AddressInput(String);
@@ -45,12 +69,15 @@ pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AddressInput>()
+            .init_resource::<PendingRebind>()
             .add_systems(Startup, setup_menu)
             .add_systems(
                 Update,
                 (
                     capture_address_input,
                     handle_menu_buttons,
+                    capture_rebind,
+                    update_settings_text,
                     update_menu_text,
                     update_button_appearance,
                     close_menu_after_connection,
@@ -206,6 +233,30 @@ fn setup_menu(
                         ));
                     });
 
+
+                panel
+                    .spawn((
+                        Button,
+                        Hovered::default(),
+                        MenuAction::OpenSettings,
+                        Node {
+                            width: percent(100),
+                            height: px(48),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            margin: UiRect::vertical(px(6)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.13, 0.18, 0.20)),
+                    ))
+                    .with_children(|button| {
+                        button.spawn((
+                            Text::new("SETTINGS"),
+                            TextFont { font_size: FontSize::Px(17.0), ..default() },
+                            TextColor(Color::srgb(0.82, 0.88, 0.88)),
+                        ));
+                    });
+
                 panel.spawn((
                     MenuStatusText,
                     Text::new("Select Host Server or Connect Server"),
@@ -272,10 +323,14 @@ fn capture_address_input(
 }
 
 fn handle_menu_buttons(
+    mut commands: Commands,
     buttons: Query<&MenuAction, (With<Button>, Added<Pressed>)>,
     address: Res<AddressInput>,
     mut request: ResMut<PendingNetworkRequest>,
     mut status: ResMut<NetworkStatus>,
+    mut settings: ResMut<PlayerSettings>,
+    mut pending_rebind: ResMut<PendingRebind>,
+    overlays: Query<Entity, With<SettingsOverlay>>,
 ) {
     for action in &buttons {
         match action {
@@ -283,6 +338,25 @@ fn handle_menu_buttons(
                 request.0 = Some(NetworkRequest::Host);
                 status.message = "Starting host server...".to_string();
             }
+            MenuAction::OpenSettings => {
+                if overlays.is_empty() {
+                    spawn_settings_overlay(&mut commands, &settings);
+                }
+            }
+            MenuAction::CloseSettings => {
+                for entity in &overlays {
+                    commands.entity(entity).despawn();
+                }
+                pending_rebind.0 = None;
+            }
+            MenuAction::SensitivityDown => {
+                settings.mouse_sensitivity = (settings.mouse_sensitivity - 0.0005).max(0.0005);
+            }
+            MenuAction::SensitivityUp => {
+                settings.mouse_sensitivity = (settings.mouse_sensitivity + 0.0005).min(0.01);
+            }
+            MenuAction::ToggleInvertY => settings.invert_mouse_y = !settings.invert_mouse_y,
+            MenuAction::Rebind(action) => pending_rebind.0 = Some(*action),
             MenuAction::Connect => match address.0.parse::<SocketAddr>() {
                 Ok(server_addr) => {
                     request.0 = Some(NetworkRequest::Connect(server_addr));
@@ -353,4 +427,229 @@ fn close_menu_after_connection(
         cursor.visible = false;
     }
     info!("Entering gameplay after network connection");
+}
+
+
+fn spawn_settings_overlay(commands: &mut Commands, settings: &PlayerSettings) {
+    commands.spawn((
+        SettingsOverlay,
+        GlobalZIndex(20),
+        Node {
+            position_type: PositionType::Absolute,
+            width: percent(100),
+            height: percent(100),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.008, 0.014, 0.020, 0.985)),
+    )).with_children(|overlay| {
+        overlay.spawn((
+            Node {
+                width: px(620),
+                max_height: percent(94),
+                padding: UiRect::all(px(26)),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Stretch,
+                row_gap: px(7),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.035, 0.052, 0.064)),
+            BorderColor::all(Color::srgb(0.28, 0.39, 0.43)),
+        )).with_children(|panel| {
+            panel.spawn((
+                Text::new("SETTINGS"),
+                TextFont { font_size: FontSize::Px(30.0), ..default() },
+                TextColor(Color::srgb(0.82, 0.89, 0.90)),
+            ));
+            panel.spawn((
+                Text::new("MOUSE"),
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextColor(Color::srgb(0.82, 0.55, 0.24)),
+                Node { margin: UiRect::top(px(8)), ..default() },
+            ));
+            panel.spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                    ..default()
+                },
+            )).with_children(|row| {
+                row.spawn((
+                    Text::new(format!("SENSITIVITY  {:.4}", settings.mouse_sensitivity)),
+                    SensitivityLabel,
+                    TextFont { font_size: FontSize::Px(15.0), ..default() },
+                    TextColor(Color::srgb(0.86, 0.89, 0.88)),
+                ));
+                spawn_action_button(row, "−", MenuAction::SensitivityDown);
+                spawn_action_button(row, "+", MenuAction::SensitivityUp);
+            });
+            spawn_action_button(
+                panel,
+                if settings.invert_mouse_y { "INVERT Y: ON" } else { "INVERT Y: OFF" },
+                MenuAction::ToggleInvertY,
+            );
+            panel.spawn((
+                InvertYLabel,
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(1.0), ..default() },
+                TextColor(Color::srgb(0.86, 0.89, 0.88)),
+            ));
+            panel.spawn((
+                Text::new("KEYBOARD"),
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextColor(Color::srgb(0.82, 0.55, 0.24)),
+                Node { margin: UiRect::top(px(8)), ..default() },
+            ));
+            for (action, label) in [
+                (ControlAction::MoveForward, "MOVE FORWARD"),
+                (ControlAction::MoveBackward, "MOVE BACKWARD"),
+                (ControlAction::MoveLeft, "MOVE LEFT"),
+                (ControlAction::MoveRight, "MOVE RIGHT"),
+                (ControlAction::Sprint, "SPRINT"),
+                (ControlAction::Crouch, "CROUCH"),
+                (ControlAction::Jump, "JUMP"),
+                (ControlAction::Interact, "INTERACT / PICK UP"),
+                (ControlAction::Flashlight, "FLASHLIGHT"),
+            ] {
+                spawn_binding_button(panel, action, label, settings.binding(action));
+            }
+            panel.spawn((
+                RebindHint,
+                Text::new("Select an action to rebind it. Press Escape to cancel."),
+                TextFont { font_size: FontSize::Px(11.0), ..default() },
+                TextColor(Color::srgb(0.58, 0.68, 0.70)),
+                Node { margin: UiRect::vertical(px(8)), ..default() },
+            ));
+            spawn_action_button(panel, "BACK", MenuAction::CloseSettings);
+        });
+    });
+}
+
+fn spawn_action_button(parent: &mut ChildSpawnerCommands, label: &str, action: MenuAction) {
+    parent.spawn((
+        Button,
+        Hovered::default(),
+        action,
+        Node {
+            min_width: px(42),
+            min_height: px(34),
+            padding: UiRect::axes(px(10), px(5)),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            margin: UiRect::vertical(px(2)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.14, 0.21, 0.23)),
+    )).with_children(|button| {
+        button.spawn((
+            Text::new(label.to_string()),
+            TextFont { font_size: FontSize::Px(13.0), ..default() },
+            TextColor(Color::srgb(0.88, 0.91, 0.89)),
+        ));
+    });
+}
+
+fn spawn_binding_button(
+    parent: &mut ChildSpawnerCommands,
+    action: ControlAction,
+    label: &str,
+    key: KeyCode,
+) {
+    parent.spawn((
+        Button,
+        Hovered::default(),
+        MenuAction::Rebind(action),
+        Node {
+            width: percent(100),
+            min_height: px(28),
+            padding: UiRect::axes(px(10), px(4)),
+            justify_content: JustifyContent::SpaceBetween,
+            align_items: AlignItems::Center,
+            margin: UiRect::vertical(px(1)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.09, 0.13, 0.15)),
+    )).with_children(|button| {
+        button.spawn((
+            Text::new(label.to_string()),
+            TextFont { font_size: FontSize::Px(12.0), ..default() },
+            TextColor(Color::srgb(0.72, 0.80, 0.81)),
+        ));
+        button.spawn((
+            BindingLabel(action),
+            Text::new(format!("{key:?}")),
+            TextFont { font_size: FontSize::Px(12.0), ..default() },
+            TextColor(Color::srgb(0.92, 0.68, 0.34)),
+        ));
+    });
+}
+
+fn capture_rebind(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    overlays: Query<(), With<SettingsOverlay>>,
+    mut pending: ResMut<PendingRebind>,
+    mut settings: ResMut<PlayerSettings>,
+) {
+    if overlays.is_empty() {
+        pending.0 = None;
+        return;
+    }
+    let Some(action) = pending.0 else { return; };
+    if keyboard.just_pressed(KeyCode::Escape) {
+        pending.0 = None;
+        return;
+    }
+    const KEYS: &[KeyCode] = &[
+        KeyCode::KeyA, KeyCode::KeyB, KeyCode::KeyC, KeyCode::KeyD,
+        KeyCode::KeyE, KeyCode::KeyF, KeyCode::KeyG, KeyCode::KeyH,
+        KeyCode::KeyI, KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL,
+        KeyCode::KeyM, KeyCode::KeyN, KeyCode::KeyO, KeyCode::KeyP,
+        KeyCode::KeyQ, KeyCode::KeyR, KeyCode::KeyS, KeyCode::KeyT,
+        KeyCode::KeyU, KeyCode::KeyV, KeyCode::KeyW, KeyCode::KeyX,
+        KeyCode::KeyY, KeyCode::KeyZ, KeyCode::Space, KeyCode::ShiftLeft,
+        KeyCode::ControlLeft, KeyCode::AltLeft, KeyCode::Tab, KeyCode::CapsLock,
+        KeyCode::ArrowUp, KeyCode::ArrowDown, KeyCode::ArrowLeft, KeyCode::ArrowRight,
+        KeyCode::Digit0, KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3,
+        KeyCode::Digit4, KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7,
+        KeyCode::Digit8, KeyCode::Digit9,
+    ];
+    for &key in KEYS {
+        if keyboard.just_pressed(key) {
+            settings.set_binding(action, key);
+            pending.0 = None;
+            break;
+        }
+    }
+}
+
+fn update_settings_text(
+    settings: Res<PlayerSettings>,
+    pending: Res<PendingRebind>,
+    mut bindings: Query<(&BindingLabel, &mut Text)>,
+    mut sensitivity: Query<&mut Text, (With<SensitivityLabel>, Without<BindingLabel>)>,
+    mut invert: Query<&mut Text, (With<InvertYLabel>, Without<BindingLabel>, Without<SensitivityLabel>)>,
+    mut hint: Query<&mut Text, (With<RebindHint>, Without<BindingLabel>, Without<SensitivityLabel>, Without<InvertYLabel>)>,
+) {
+    for (label, mut text) in &mut bindings {
+        **text = if pending.0 == Some(label.0) {
+            "PRESS A KEY...".to_string()
+        } else {
+            format!("{:?}", settings.binding(label.0))
+        };
+    }
+    for mut text in &mut sensitivity {
+        **text = format!("SENSITIVITY  {:.4}", settings.mouse_sensitivity);
+    }
+    for mut text in &mut invert {
+        **text = if settings.invert_mouse_y { "INVERT Y: ON" } else { "INVERT Y: OFF" }.to_string();
+    }
+    for mut text in &mut hint {
+        **text = if pending.0.is_some() {
+            "Press a key to assign it. Escape cancels.".to_string()
+        } else {
+            "Select an action to rebind it.".to_string()
+        };
+    }
 }
