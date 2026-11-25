@@ -337,7 +337,7 @@ fn capture_player_input(
     player_input.sprint = keyboard.pressed(settings.sprint);
     player_input.crouch = keyboard.pressed(settings.crouch);
     player_input.jump_pressed = keyboard.just_pressed(settings.jump);
-    player_input.interact_pressed = keyboard.just_pressed(settings.interact);
+    player_input.interact_pressed |= keyboard.just_pressed(settings.interact);
     player_input.pitch = cameras.single().map(|camera| camera.0).unwrap_or(0.0);
 }
 
