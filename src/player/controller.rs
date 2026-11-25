@@ -124,7 +124,10 @@ impl Plugin for PlayerPlugin {
                     .after(InputSystems),
             )
             .add_systems(FixedUpdate, move_player)
-            .add_systems(Update, (resume_from_pause_button, update_camera_stance, update_stamina_hud));
+            .add_systems(
+                Update,
+                (resume_from_pause_button, update_camera_stance, update_stamina_hud),
+            );
     }
 }
 
