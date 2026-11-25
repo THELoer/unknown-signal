@@ -162,6 +162,7 @@ fn buffer_local_player_input(
         yaw = packet.yaw,
         pitch = packet.pitch,
         interact = packet.interact,
+        wrote_input = wrote_client_input,
         sprint = packet.sprint,
         crouch = packet.crouch,
         jump = packet.jump,
