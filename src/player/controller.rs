@@ -111,6 +111,7 @@ impl Plugin for PlayerPlugin {
             .init_resource::<GameplayActive>()
             .init_resource::<PlayerSettings>()
             .init_resource::<PlayerStamina>()
+            .init_resource::<CameraToolState>()
             .add_systems(Startup, (spawn_player, spawn_camera_tool, spawn_stamina_hud).chain())
             .add_systems(
                 PreUpdate,
