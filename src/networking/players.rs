@@ -37,11 +37,6 @@ struct NetworkPlayerMotion {
     vertical_velocity: f32,
 }
 
-/// Marker replicated with every server-owned player root. It identifies an
-/// actual player pawn, rather than every entity carrying a replicated Transform.
-#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
-pub(crate) struct NetworkPlayerPawn;
-
 /// Visual marker added to client-side remote copies after their first
 /// frame. The mesh is a child of the replicated root and therefore inherits
 /// the server-authored position and rotation.
@@ -157,7 +152,6 @@ fn spawn_player_for_connected_peer(
     let player = commands
         .spawn((
             NetworkPlayer,
-            NetworkPlayerPawn,
             NetworkPlayerMotion::default(),
             ActionState::<NetworkPlayerInput>::default(),
             Transform::from_translation(spawn_position),
@@ -245,9 +239,11 @@ fn movement_speed(input: &NetworkPlayerInput) -> f32 {
     }
 }
 
-/// Render replicated player pawns that belong to another peer. `Remote` alone
-/// is not enough: all Transform-replicated entities can match it. `Controlled`
-/// marks the pawn owned by this client, whose first-person rig is the visual.
+/// Render replicated entities owned by another peer. Both kinds of player root
+/// must be supported here: the host's local `Player` entity and server-spawned
+/// `NetworkPlayer` entities. They do not share a gameplay marker, but Lightyear
+/// gives their received copies the same `Remote` ownership marker. `Controlled`
+/// identifies the local first-person pawn and must not receive a second body.
 fn spawn_remote_player_visuals(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -256,7 +252,6 @@ fn spawn_remote_player_visuals(
         Entity,
         (
             With<Remote>,
-            With<NetworkPlayerPawn>,
             Without<Controlled>,
             Without<NetworkPlayerVisual>,
         ),
@@ -299,13 +294,6 @@ fn spawn_remote_player_visuals(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn player_pawn_marker_is_a_component() {
-        let mut world = World::new();
-        let entity = world.spawn(NetworkPlayerPawn).id();
-        assert!(world.entity(entity).contains::<NetworkPlayerPawn>());
-    }
 
     #[test]
     fn forward_input_moves_toward_negative_z() {
