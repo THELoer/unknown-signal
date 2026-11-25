@@ -25,6 +25,12 @@ const DROP_DISTANCE: f32 = 1.35;
 const INTERACTION_COOLDOWN_SECONDS: f32 = 0.20;
 const NETWORK_TICK_SECONDS: f32 = 1.0 / 64.0;
 
+#[derive(Default)]
+struct RemoteInteractionInputState {
+    cooldown_seconds: f32,
+    was_pressed: bool,
+}
+
 /// Replicated state for a door. The animation timer is deliberately local:
 /// the server owns the actual Transform and clients receive its updates.
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -455,7 +461,7 @@ fn process_local_host_interaction(
 /// mutate arbitrary entities by guessing their local Bevy IDs.
 fn process_remote_player_interactions(
     mut commands: Commands,
-    mut cooldowns: Local<HashMap<Entity, f32>>,
+    mut input_states: Local<HashMap<Entity, RemoteInteractionInputState>>,
     players: Query<
         (
             Entity,
@@ -471,17 +477,29 @@ fn process_remote_player_interactions(
     mut pickups: Query<(Entity, &mut PickupState), With<PickupItem>>,
     held_items: Query<(Entity, &HeldByServer), With<PickupItem>>,
 ) {
-    cooldowns.retain(|entity, _| players.get(*entity).is_ok());
+    input_states.retain(|entity, _| players.get(*entity).is_ok());
     for (player, transform, player_id, action_state) in &players {
-        let cooldown = cooldowns.entry(player).or_default();
-        *cooldown = (*cooldown - NETWORK_TICK_SECONDS).max(0.0);
+        let state = input_states.entry(player).or_default();
+        state.cooldown_seconds =
+            (state.cooldown_seconds - NETWORK_TICK_SECONDS).max(0.0);
 
         let mut input = action_state.0.clone();
         input.sanitize();
-        if !input.interact || *cooldown > 0.0 {
+        let pressed_edge = input.interact && !state.was_pressed;
+        state.was_pressed = input.interact;
+        if !pressed_edge || state.cooldown_seconds > 0.0 {
             continue;
         }
-        *cooldown = INTERACTION_COOLDOWN_SECONDS;
+        state.cooldown_seconds = INTERACTION_COOLDOWN_SECONDS;
+
+        debug!(
+            target: "unknown_signal::interaction",
+            player = ?player,
+            player_id = player_id.0,
+            yaw = input.yaw,
+            pitch = input.pitch,
+            "received remote interaction request"
+        );
 
         let aim = Quat::from_rotation_y(input.yaw) * Quat::from_rotation_x(input.pitch);
         let direction = Dir3::new(aim * Vec3::NEG_Z).unwrap_or(Dir3::NEG_Z);
@@ -549,25 +567,54 @@ fn apply_interaction_request(
         true,
         &filter,
     ) else {
+        debug!(
+            target: "unknown_signal::interaction",
+            player_id,
+            origin = ?origin,
+            direction = ?*direction,
+            "interaction ray did not hit a target within range"
+        );
         return;
     };
 
+    debug!(
+        target: "unknown_signal::interaction",
+        player_id,
+        hit_entity = ?hit.entity,
+        distance = hit.distance,
+        "interaction ray hit an entity"
+    );
+
     // A free pickup can be claimed by exactly one player. The server checks
     // the replicated state before inserting its private holder Entity.
-    if let Ok((item, mut state)) = pickups.get_mut(hit.entity) {
-        if state.holder_id.is_some() {
+    let pickup_entity = if let Ok((entity, _)) = pickups.get_mut(hit.entity) {
+        Some(entity)
+    } else if let Ok(collider) = collider_bodies.get(hit.entity) {
+        pickups
+            .get_mut(collider.body)
+            .ok()
+            .map(|(entity, _)| entity)
+    } else {
+        None
+    };
+
+    if let Some(item) = pickup_entity {
+        if let Ok((_, mut state)) = pickups.get_mut(item) {
+            if state.holder_id.is_some() {
+                debug!("Player {player_id} attempted to take an already-held item");
+                return;
+            }
+
+            state.holder_id = Some(player_id);
+            commands
+                .entity(item)
+                .insert(HeldByServer(player))
+                .remove::<RigidBody>()
+                .remove::<Collider>()
+                .remove::<LinearVelocity>();
+            info!("Player {player_id} picked up a network item");
             return;
         }
-
-        state.holder_id = Some(player_id);
-        commands
-            .entity(item)
-            .insert(HeldByServer(player))
-            .remove::<RigidBody>()
-            .remove::<Collider>()
-            .remove::<LinearVelocity>();
-        info!("Player {player_id} picked up a network item");
-        return;
     }
 
     // Door colliders live on visual children. Resolve the collider back to the
