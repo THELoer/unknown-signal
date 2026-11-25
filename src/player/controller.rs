@@ -116,7 +116,6 @@ impl Plugin for PlayerPlugin {
                 PreUpdate,
                 (
                     toggle_pause,
-                    sync_cursor_capture,
                     capture_player_input,
                     update_camera_look,
                     toggle_flashlight,
@@ -124,6 +123,7 @@ impl Plugin for PlayerPlugin {
                     .chain()
                     .after(InputSystems),
             )
+            .add_systems(PostUpdate, sync_cursor_capture)
             .add_systems(FixedUpdate, move_player)
             .add_systems(
                 Update,
@@ -388,9 +388,14 @@ fn toggle_pause(
     mut gameplay: ResMut<GameplayActive>,
     mut commands: Commands,
     overlays: Query<Entity, With<PauseOverlay>>,
-    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     if !keyboard.just_pressed(KeyCode::Escape) {
+        return;
+    }
+
+    // A pause overlay is authoritative: ignore repeated Escape presses while it exists.
+    // Resume is handled by the explicit button, preventing duplicate overlays.
+    if !overlays.is_empty() {
         return;
     }
 
@@ -448,21 +453,7 @@ fn toggle_pause(
                 });
             });
 
-        for mut cursor in &mut windows {
-            cursor.grab_mode = CursorGrabMode::None;
-            cursor.visible = true;
-        }
         info!("Gameplay paused locally");
-    } else if !overlays.is_empty() {
-        gameplay.0 = true;
-        for entity in &overlays {
-            commands.entity(entity).despawn();
-        }
-        for mut cursor in &mut windows {
-            cursor.grab_mode = CursorGrabMode::Locked;
-            cursor.visible = false;
-        }
-        info!("Gameplay resumed locally");
     }
 }
 
@@ -471,7 +462,6 @@ fn resume_from_pause_button(
     mut gameplay: ResMut<GameplayActive>,
     mut commands: Commands,
     overlays: Query<Entity, With<PauseOverlay>>,
-    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     if buttons.is_empty() {
         return;
@@ -480,10 +470,6 @@ fn resume_from_pause_button(
     gameplay.0 = true;
     for entity in &overlays {
         commands.entity(entity).despawn();
-    }
-    for mut cursor in &mut windows {
-        cursor.grab_mode = CursorGrabMode::Locked;
-        cursor.visible = false;
     }
     info!("Gameplay resumed from pause menu");
 }
