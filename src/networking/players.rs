@@ -55,13 +55,13 @@ pub(crate) struct NetworkPlayersPlugin;
 impl Plugin for NetworkPlayersPlugin {
     fn build(&self, app: &mut App) {
         app.component::<NetworkAvatar>().replicate();
-        app.add_systems(Startup, mark_local_player_as_network_avatar)
-        .add_systems(
+        app.add_systems(
             FixedPreUpdate,
             buffer_local_player_input.in_set(InputSystems::WriteClientInputs),
         )
         .add_systems(FixedUpdate, simulate_authoritative_players)
         .add_systems(Update, spawn_remote_player_visuals)
+        .add_observer(mark_local_player_as_network_avatar)
         .add_observer(add_input_marker_to_controlled_player)
         .add_observer(spawn_player_for_connected_peer);
     }
@@ -69,12 +69,10 @@ impl Plugin for NetworkPlayersPlugin {
 
 /// The host's local first-person player is also replicated to remote peers.
 fn mark_local_player_as_network_avatar(
+    trigger: On<Add<Player>>,
     mut commands: Commands,
-    players: Query<Entity, (With<Player>, Without<NetworkAvatar>)>,
 ) {
-    for player in &players {
-        commands.entity(player).insert(NetworkAvatar);
-    }
+    commands.entity(trigger.entity).insert(NetworkAvatar);
 }
 
 /// When Lightyear marks a replicated entity as Controlled, attach the native
