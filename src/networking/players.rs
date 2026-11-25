@@ -174,8 +174,12 @@ fn spawn_player_for_connected_peer(
     };
 
     let peer_id = remote_id.0;
-    let spawn_lane = (peer_id.to_bits() % 7) as f32 - 3.0;
-    let spawn_position = Vec3::new(spawn_lane * PLAYER_SPAWN_SPACING, PLAYER_GROUND_HEIGHT, 0.0);
+    // Place remote players beside the host's test-scene start point, facing
+    // the shared door and pickup area. The old wide X lanes and Z=0 spawn
+    // could leave a new client several metres out of interaction reach and
+    // facing away from every replicated test object.
+    let spawn_lane = (peer_id.to_bits() % 4) as f32 - 1.5;
+    let spawn_position = Vec3::new(spawn_lane * 0.75, PLAYER_GROUND_HEIGHT, 5.0);
 
     let player = commands
         .spawn((
