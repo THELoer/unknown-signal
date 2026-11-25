@@ -1,5 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
+use super::hud;
+
 use avian3d::{math::*, prelude::*};
 use bevy::{
     camera::Hdr,
@@ -18,7 +20,7 @@ const CROUCHED_CAPSULE_LENGTH: f32 = 0.45;
 const STANCE_HEIGHT_DELTA: f32 = (STANDING_CAPSULE_LENGTH - CROUCHED_CAPSULE_LENGTH) * 0.5;
 pub(super) const EYE_HEIGHT: f32 = 0.55;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.05;
-const STAMINA_MAX: f32 = 100.0;
+pub(super) const STAMINA_MAX: f32 = 100.0;
 const SPRINT_DRAIN_PER_SECOND: f32 = 26.0;
 const STAMINA_REGEN_PER_SECOND: f32 = 18.0;
 const STAMINA_REGEN_DELAY: f32 = 0.85;
@@ -112,7 +114,7 @@ impl Plugin for PlayerPlugin {
             .init_resource::<PlayerSettings>()
             .init_resource::<PlayerStamina>()
             .init_resource::<CameraToolState>()
-            .add_systems(Startup, (spawn_player, spawn_camera_tool, spawn_stamina_hud).chain())
+            .add_systems(Startup, (spawn_player, spawn_camera_tool, hud::spawn_hud).chain())
             .add_systems(
                 PreUpdate,
                 (
@@ -126,7 +128,7 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems(PostUpdate, sync_cursor_capture)
             .add_systems(PreUpdate, toggle_camera_tool.after(InputSystems))
-            .add_systems(Update, sync_camera_tool_visibility)
+            .add_systems(Update, (sync_camera_tool_visibility, hud::update_inventory_selection, hud::sync_inventory_selection))
             .add_systems(FixedUpdate, move_player)
             .add_systems(
                 Update,
@@ -283,8 +285,8 @@ impl Default for PlayerMovementSettings {
 }
 
 #[derive(Resource)]
-struct PlayerStamina {
-    current: f32,
+pub(super) struct PlayerStamina {
+    pub(super) current: f32,
     regen_cooldown: f32,
 }
 
@@ -297,33 +299,6 @@ impl Default for PlayerStamina {
     }
 }
 
-#[derive(Component)]
-struct StaminaHud;
-
-fn spawn_stamina_hud(mut commands: Commands) {
-    commands.spawn((
-        StaminaHud,
-        Text::new("STAMINA  100%"),
-        TextFont {
-            font_size: FontSize::Px(14.0),
-            ..default()
-        },
-        TextColor(Color::srgb(0.68, 0.84, 0.78)),
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(24),
-            top: px(24),
-            ..default()
-        },
-    ));
-}
-
-fn update_stamina_hud(stamina: Res<PlayerStamina>, mut labels: Query<&mut Text, With<StaminaHud>>) {
-    let percent = (stamina.current / STAMINA_MAX * 100.0).round() as u32;
-    for mut label in &mut labels {
-        **label = format!("STAMINA  {percent:>3}%");
-    }
-}
 
 #[derive(Resource, Default)]
 pub(crate) struct PlayerInput {
