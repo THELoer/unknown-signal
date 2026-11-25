@@ -27,6 +27,11 @@ const PLAYER_TERMINAL_VELOCITY: f32 = 45.0;
 const PLAYER_GROUND_HEIGHT: f32 = 1.0;
 const PLAYER_SPAWN_SPACING: f32 = 1.4;
 
+/// Replicated identity marker shared by every network-visible player root.
+/// Unlike Lightyear's Remote marker, this cannot match transport/link entities.
+#[derive(Component)]
+pub(crate) struct NetworkAvatar;
+
 /// Server-only marker for a player controlled by a remote Lightyear peer.
 #[derive(Component)]
 pub(crate) struct NetworkPlayer;
@@ -49,15 +54,25 @@ pub(crate) struct NetworkPlayersPlugin;
 
 impl Plugin for NetworkPlayersPlugin {
     fn build(&self, app: &mut App) {
+        app.component::<NetworkAvatar>().replicate();
         app.add_systems(
             FixedPreUpdate,
             buffer_local_player_input.in_set(InputSystems::WriteClientInputs),
         )
         .add_systems(FixedUpdate, simulate_authoritative_players)
         .add_systems(Update, spawn_remote_player_visuals)
+        .add_observer(mark_local_player_as_network_avatar)
         .add_observer(add_input_marker_to_controlled_player)
         .add_observer(spawn_player_for_connected_peer);
     }
+}
+
+/// The host's local first-person player is also replicated to remote peers.
+fn mark_local_player_as_network_avatar(
+    trigger: On<Add<Player>>,
+    mut commands: Commands,
+) {
+    commands.entity(trigger.entity).insert(NetworkAvatar);
 }
 
 /// When Lightyear marks a replicated entity as Controlled, attach the native
@@ -154,6 +169,7 @@ fn spawn_player_for_connected_peer(
     let player = commands
         .spawn((
             NetworkPlayer,
+            NetworkAvatar,
             NetworkPlayerMotion::default(),
             ActionState::<NetworkPlayerInput>::default(),
             Transform::from_translation(spawn_position),
@@ -241,11 +257,10 @@ fn movement_speed(input: &NetworkPlayerInput) -> f32 {
     }
 }
 
-/// Render replicated entities owned by another peer. Both kinds of player root
-/// must be supported here: the host's local `Player` entity and server-spawned
-/// `NetworkPlayer` entities. They do not share a gameplay marker, but Lightyear
-/// gives their received copies the same `Remote` ownership marker. `Controlled`
-/// identifies the local first-person pawn and must not receive a second body.
+/// Render actual player roots, not every Lightyear Remote entity. A remote
+/// client receives host Player and other NetworkPlayer roots with NetworkAvatar.
+/// The host itself renders the authoritative NetworkPlayer root directly;
+/// its server-side entity does not carry the client-side Remote marker.
 fn spawn_remote_player_visuals(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -253,7 +268,8 @@ fn spawn_remote_player_visuals(
     remote_players: Query<
         Entity,
         (
-            With<Remote>,
+            With<NetworkAvatar>,
+            Or<(With<Remote>, With<NetworkPlayer>)>,
             Without<Controlled>,
             Without<NetworkPlayerVisual>,
         ),
@@ -287,7 +303,7 @@ fn spawn_remote_player_visuals(
             ));
 
         info!(
-            "Attached remote player visual to replicated entity {:?}",
+            "Attached player avatar visual to network player entity {:?}",
             entity
         );
     }
