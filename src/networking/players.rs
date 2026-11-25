@@ -7,6 +7,7 @@
 //! first-person controller remains local and never owns the server Transform.
 
 use bevy::prelude::*;
+use lightyear::connection::host::HostClient;
 use lightyear::prelude::client::input::*;
 use lightyear::prelude::input::native::*;
 use lightyear::prelude::server::*;
@@ -81,8 +82,8 @@ fn add_input_marker_to_controlled_player(
     commands
         .entity(trigger.entity)
         .insert(InputMarker::<NetworkPlayerInput>::default());
-    debug!(
-        "Added network input marker to controlled player {:?}",
+    info!(
+        "Controlled player entity {:?} received by this client",
         trigger.entity
     );
 }
@@ -134,12 +135,13 @@ fn buffer_local_player_input(
 }
 
 /// A remote connection is not a player until Lightyear has accepted it and
-/// emitted Connected. ClientOf prevents this observer from treating the local
-/// HostClient endpoint as a remote player.
+/// emitted Connected. The in-process HostClient also has ClientOf and a
+/// RemoteId (Local(0)), but it is the host's own endpoint, not a remote player.
+/// Exclude it explicitly; the host already has its local `Player` entity.
 fn spawn_player_for_connected_peer(
     trigger: On<Add<Connected>>,
     mut commands: Commands,
-    remote_clients: Query<&RemoteId, With<ClientOf>>,
+    remote_clients: Query<&RemoteId, (With<ClientOf>, Without<HostClient>)>,
 ) {
     let Ok(remote_id) = remote_clients.get(trigger.entity) else {
         return;
@@ -284,8 +286,8 @@ fn spawn_remote_player_visuals(
                 Name::new("Remote Network Player Avatar"),
             ));
 
-        debug!(
-            "Attached network player visual to remote entity {:?}",
+        info!(
+            "Attached remote player visual to replicated entity {:?}",
             entity
         );
     }
