@@ -256,10 +256,20 @@ fn monitor_connection(
 fn update_network_diagnostics(
     clients: Query<(), (With<Client>, With<Connected>)>,
     server_peers: Query<(), (With<LinkOf>, With<Connected>, Without<HostClient>)>,
-    remote_players: Query<(), With<lightyear::prelude::client::Remote>>,
+    player_avatars: Query<
+        (),
+        (
+            With<players::NetworkAvatar>,
+            Or<(
+                With<lightyear::prelude::client::Remote>,
+                With<players::NetworkPlayer>,
+            )>,
+            Without<lightyear::prelude::client::Controlled>,
+        ),
+    >,
     mut diagnostics: ResMut<NetworkDiagnostics>,
 ) {
     diagnostics.connected_clients = clients.iter().count();
     diagnostics.connected_server_peers = server_peers.iter().count();
-    diagnostics.remote_player_avatars = remote_players.iter().count();
+    diagnostics.remote_player_avatars = player_avatars.iter().count();
 }
