@@ -118,7 +118,7 @@ fn add_input_marker_to_controlled_player(
 /// about to serialize, producing a connected client that never moves remotely.
 fn buffer_local_player_input(
     timeline: Res<LocalTimeline>,
-    mut local_input: ResMut<PlayerInput>,
+    local_input: Res<PlayerInput>,
     status: Res<super::NetworkStatus>,
     local_players: Query<&Transform, With<Player>>,
     mut controlled_inputs: Query<
@@ -148,12 +148,6 @@ fn buffer_local_player_input(
         action_state.0 = packet.clone();
         wrote_client_input = true;
     }
-    // Keep the edge buffered until a client-controlled pawn exists and a
-    // fixed-tick sample has actually been written. Host/offline input is local.
-    if status.mode != Some(super::NetworkMode::Client) || wrote_client_input {
-        local_input.interact_pressed = false;
-    }
-
     trace!(
         target: "unknown_signal::network",
         tick = timeline.tick().0,
