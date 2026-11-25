@@ -587,20 +587,35 @@ fn apply_interaction_request(
 
     // A free pickup can be claimed by exactly one player. The server checks
     // the replicated state before inserting its private holder Entity.
-    if let Ok((item, mut state)) = pickups.get_mut(hit.entity) {
-        if state.holder_id.is_some() {
+    let pickup_entity = pickups
+        .get_mut(hit.entity)
+        .map(|(entity, _)| entity)
+        .or_else(|_| {
+            collider_bodies
+                .get(hit.entity)
+                .ok()
+                .map(|collider| collider.body)
+                .and_then(|body| pickups.get_mut(body).ok().map(|(entity, _)| entity))
+                .ok_or(())
+        });
+
+    if let Ok(item) = pickup_entity {
+        if let Ok((_, mut state)) = pickups.get_mut(item) {
+            if state.holder_id.is_some() {
+                debug!("Player {player_id} attempted to take an already-held item");
+                return;
+            }
+
+            state.holder_id = Some(player_id);
+            commands
+                .entity(item)
+                .insert(HeldByServer(player))
+                .remove::<RigidBody>()
+                .remove::<Collider>()
+                .remove::<LinearVelocity>();
+            info!("Player {player_id} picked up a network item");
             return;
         }
-
-        state.holder_id = Some(player_id);
-        commands
-            .entity(item)
-            .insert(HeldByServer(player))
-            .remove::<RigidBody>()
-            .remove::<Collider>()
-            .remove::<LinearVelocity>();
-        info!("Player {player_id} picked up a network item");
-        return;
     }
 
     // Door colliders live on visual children. Resolve the collider back to the
