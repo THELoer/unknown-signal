@@ -1,5 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
+use super::hud;
+
 use avian3d::{math::*, prelude::*};
 use bevy::{
     camera::Hdr,
@@ -18,7 +20,7 @@ const CROUCHED_CAPSULE_LENGTH: f32 = 0.45;
 const STANCE_HEIGHT_DELTA: f32 = (STANDING_CAPSULE_LENGTH - CROUCHED_CAPSULE_LENGTH) * 0.5;
 pub(super) const EYE_HEIGHT: f32 = 0.55;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.05;
-const STAMINA_MAX: f32 = 100.0;
+pub(super) const STAMINA_MAX: f32 = 100.0;
 const SPRINT_DRAIN_PER_SECOND: f32 = 26.0;
 const STAMINA_REGEN_PER_SECOND: f32 = 18.0;
 const STAMINA_REGEN_DELAY: f32 = 0.85;
@@ -111,7 +113,8 @@ impl Plugin for PlayerPlugin {
             .init_resource::<GameplayActive>()
             .init_resource::<PlayerSettings>()
             .init_resource::<PlayerStamina>()
-            .add_systems(Startup, (spawn_player, spawn_stamina_hud))
+            .init_resource::<CameraToolState>()
+            .add_systems(Startup, (spawn_player, spawn_camera_tool, hud::spawn_hud).chain())
             .add_systems(
                 PreUpdate,
                 (
@@ -124,10 +127,19 @@ impl Plugin for PlayerPlugin {
                     .after(InputSystems),
             )
             .add_systems(PostUpdate, sync_cursor_capture)
+            .add_systems(PreUpdate, toggle_camera_tool.after(InputSystems))
+            .add_systems(
+                Update,
+                (
+                    sync_camera_tool_visibility,
+                    hud::update_inventory_selection,
+                    hud::sync_inventory_selection,
+                ),
+            )
             .add_systems(FixedUpdate, move_player)
             .add_systems(
                 Update,
-                (resume_from_pause_button, update_camera_stance, update_stamina_hud),
+                (resume_from_pause_button, update_camera_stance, hud::update_stamina_hud),
             );
     }
 }
@@ -145,6 +157,104 @@ pub(super) struct PlayerCamera;
 
 #[derive(Component, Default)]
 pub(super) struct CameraPitch(pub(super) f32);
+
+
+#[derive(Resource, Default)]
+struct CameraToolState {
+    equipped: bool,
+}
+
+#[derive(Component)]
+struct CameraToolVisual;
+
+/// Spawn a simple first-person camera prop. Capture and viewfinder rendering
+/// are intentionally left for later Phase 3 steps.
+fn spawn_camera_tool(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    cameras: Query<Entity, With<PlayerCamera>>,
+) {
+    let body_mesh = meshes.add(Cuboid::new(0.28, 0.19, 0.13));
+    let lens_mesh = meshes.add(Cylinder::new(0.055, 0.13));
+    let flash_mesh = meshes.add(Cuboid::new(0.09, 0.035, 0.045));
+    let body_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.075, 0.095, 0.105),
+        metallic: 0.72,
+        perceptual_roughness: 0.42,
+        ..default()
+    });
+    let lens_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.12, 0.25, 0.29),
+        metallic: 0.88,
+        perceptual_roughness: 0.18,
+        ..default()
+    });
+    let flash_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.72, 0.49, 0.22),
+        metallic: 0.48,
+        perceptual_roughness: 0.36,
+        ..default()
+    });
+
+    for camera in &cameras {
+        commands.entity(camera).with_children(|children| {
+            children
+                .spawn((
+                    CameraToolVisual,
+                    Visibility::Hidden,
+                    Transform::from_xyz(0.28, -0.22, -0.55),
+                    Name::new("Handheld Research Camera"),
+                ))
+                .with_children(|tool| {
+                    tool.spawn((
+                        Mesh3d(body_mesh.clone()),
+                        MeshMaterial3d(body_material.clone()),
+                        Transform::default(),
+                    ));
+                    tool.spawn((
+                        Mesh3d(lens_mesh.clone()),
+                        MeshMaterial3d(lens_material.clone()),
+                        Transform::from_xyz(0.0, 0.0, -0.105)
+                            .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
+                    ));
+                    tool.spawn((
+                        Mesh3d(flash_mesh.clone()),
+                        MeshMaterial3d(flash_material.clone()),
+                        Transform::from_xyz(0.0, 0.115, 0.0),
+                    ));
+                });
+        });
+    }
+}
+
+fn toggle_camera_tool(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    active: Res<GameplayActive>,
+    mut state: ResMut<CameraToolState>,
+) {
+    if active.0 && keyboard.just_pressed(KeyCode::KeyC) {
+        state.equipped = !state.equipped;
+        info!(
+            "Research camera {}",
+            if state.equipped { "equipped" } else { "stowed" }
+        );
+    }
+}
+
+fn sync_camera_tool_visibility(
+    state: Res<CameraToolState>,
+    mut tools: Query<&mut Visibility, With<CameraToolVisual>>,
+) {
+    let visibility = if state.equipped {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    for mut tool in &mut tools {
+        *tool = visibility;
+    }
+}
 
 #[derive(Component)]
 struct Flashlight {
@@ -182,8 +292,8 @@ impl Default for PlayerMovementSettings {
 }
 
 #[derive(Resource)]
-struct PlayerStamina {
-    current: f32,
+pub(super) struct PlayerStamina {
+    pub(super) current: f32,
     regen_cooldown: f32,
 }
 
@@ -196,33 +306,6 @@ impl Default for PlayerStamina {
     }
 }
 
-#[derive(Component)]
-struct StaminaHud;
-
-fn spawn_stamina_hud(mut commands: Commands) {
-    commands.spawn((
-        StaminaHud,
-        Text::new("STAMINA  100%"),
-        TextFont {
-            font_size: FontSize::Px(14.0),
-            ..default()
-        },
-        TextColor(Color::srgb(0.68, 0.84, 0.78)),
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(24),
-            top: px(24),
-            ..default()
-        },
-    ));
-}
-
-fn update_stamina_hud(stamina: Res<PlayerStamina>, mut labels: Query<&mut Text, With<StaminaHud>>) {
-    let percent = (stamina.current / STAMINA_MAX * 100.0).round() as u32;
-    for mut label in &mut labels {
-        **label = format!("STAMINA  {percent:>3}%");
-    }
-}
 
 #[derive(Resource, Default)]
 pub(crate) struct PlayerInput {
