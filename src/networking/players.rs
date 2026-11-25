@@ -14,8 +14,8 @@ use lightyear::prelude::server::*;
 use lightyear::prelude::*;
 
 use super::protocol::NetworkPlayerInput;
-use serde::{Deserialize, Serialize};
 use crate::player::{Player, PlayerInput};
+use serde::{Deserialize, Serialize};
 
 const NETWORK_TICK_RATE: f32 = 64.0;
 const NETWORK_TICK_SECONDS: f32 = 1.0 / NETWORK_TICK_RATE;
@@ -74,10 +74,7 @@ impl Plugin for NetworkPlayersPlugin {
 }
 
 /// The host's local first-person player is also replicated to remote peers.
-fn mark_local_player_as_network_avatar(
-    trigger: On<Add<Player>>,
-    mut commands: Commands,
-) {
+fn mark_local_player_as_network_avatar(trigger: On<Add<Player>>, mut commands: Commands) {
     commands
         .entity(trigger.entity)
         .insert((NetworkAvatar, NetworkAvatarId(0)));
