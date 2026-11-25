@@ -7,6 +7,7 @@
 //! first-person controller remains local and never owns the server Transform.
 
 use bevy::prelude::*;
+use lightyear::connection::host::HostClient;
 use lightyear::prelude::client::input::*;
 use lightyear::prelude::input::native::*;
 use lightyear::prelude::server::*;
@@ -134,12 +135,13 @@ fn buffer_local_player_input(
 }
 
 /// A remote connection is not a player until Lightyear has accepted it and
-/// emitted Connected. ClientOf prevents this observer from treating the local
-/// HostClient endpoint as a remote player.
+/// emitted Connected. The in-process HostClient also has ClientOf and a
+/// RemoteId (Local(0)), but it is the host's own endpoint, not a remote player.
+/// Exclude it explicitly; the host already has its local `Player` entity.
 fn spawn_player_for_connected_peer(
     trigger: On<Add<Connected>>,
     mut commands: Commands,
-    remote_clients: Query<&RemoteId, With<ClientOf>>,
+    remote_clients: Query<&RemoteId, (With<ClientOf>, Without<HostClient>)>,
 ) {
     let Ok(remote_id) = remote_clients.get(trigger.entity) else {
         return;
