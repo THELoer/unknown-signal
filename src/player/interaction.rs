@@ -657,7 +657,7 @@ fn follow_held_items(
             &Transform,
             Option<&ActionState<NetworkPlayerInput>>,
         ),
-        Or<(With<Player>, With<NetworkPlayer>)>,
+        (Or<(With<Player>, With<NetworkPlayer>)>, Without<PickupItem>),
     >,
     local_input: Res<PlayerInput>,
 ) {
