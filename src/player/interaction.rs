@@ -188,7 +188,7 @@ fn attach_network_object_visuals(
     for entity in &doors {
         let is_remote = remote_entities.get(entity).is_ok();
         let mut door = commands.entity(entity);
-        door.insert(DoorVisual);
+        door.insert((DoorVisual, Visibility::default(), InheritedVisibility::default()));
         if is_remote {
             // Replicated roots do not receive Avian components. Add a local
             // kinematic body so the child collider participates in raycasts.
@@ -221,7 +221,7 @@ fn attach_network_object_visuals(
     for (entity, state) in &pickups {
         let is_remote = remote_entities.get(entity).is_ok();
         let mut pickup = commands.entity(entity);
-        pickup.insert(PickupVisual);
+        pickup.insert((PickupVisual, Visibility::default(), InheritedVisibility::default()));
 
         if is_remote {
             pickup.insert(RigidBody::Kinematic);
