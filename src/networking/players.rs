@@ -26,7 +26,6 @@ const PLAYER_GRAVITY: f32 = 20.0;
 const PLAYER_JUMP_SPEED: f32 = 5.5;
 const PLAYER_TERMINAL_VELOCITY: f32 = 45.0;
 const PLAYER_GROUND_HEIGHT: f32 = 1.0;
-const PLAYER_SPAWN_SPACING: f32 = 1.4;
 
 /// Replicated identity marker shared by every network-visible player root.
 /// Unlike Lightyear's Remote marker, this cannot match transport/link entities.
