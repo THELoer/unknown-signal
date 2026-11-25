@@ -118,7 +118,7 @@ fn add_input_marker_to_controlled_player(
 /// about to serialize, producing a connected client that never moves remotely.
 fn buffer_local_player_input(
     timeline: Res<LocalTimeline>,
-    local_input: Res<PlayerInput>,
+    mut local_input: ResMut<PlayerInput>,
     local_players: Query<&Transform, With<Player>>,
     mut controlled_inputs: Query<
         &mut ActionState<NetworkPlayerInput>,
@@ -145,6 +145,9 @@ fn buffer_local_player_input(
     for mut action_state in &mut controlled_inputs {
         action_state.0 = packet.clone();
     }
+    // The interaction key is an edge, not a held action. Consume it after
+    // the first fixed-tick sample so low frame rates cannot duplicate actions.
+    local_input.interact_pressed = false;
 
     trace!(
         target: "unknown_signal::network",
