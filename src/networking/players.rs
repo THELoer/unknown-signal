@@ -119,7 +119,6 @@ fn add_input_marker_to_controlled_player(
 fn buffer_local_player_input(
     timeline: Res<LocalTimeline>,
     local_input: Res<PlayerInput>,
-    status: Res<super::NetworkStatus>,
     local_players: Query<&Transform, With<Player>>,
     mut controlled_inputs: Query<
         &mut ActionState<NetworkPlayerInput>,
