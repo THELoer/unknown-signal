@@ -116,8 +116,11 @@ fn add_input_marker_to_controlled_player(
 /// only once at connection time lets those two transforms drift apart during play.
 /// Rotation stays local for immediate mouse-look; the same yaw is sent in input packets.
 fn sync_local_player_position(
-    controlled_players: Query<&Transform, (With<Controlled>, With<NetworkAvatar>)>,
-    mut local_players: Query<&mut Transform, With<Player>>,
+    controlled_players: Query<
+        &Transform,
+        (With<Controlled>, With<NetworkAvatar>, Without<Player>),
+    >,
+    mut local_players: Query<&mut Transform, (With<Player>, Without<Controlled>)>,
 ) {
     let (Ok(authoritative), Ok(mut local)) =
         (controlled_players.single(), local_players.single_mut())
