@@ -33,6 +33,10 @@ const PLAYER_SPAWN_SPACING: f32 = 1.4;
 #[derive(Component, Serialize, Deserialize)]
 pub(crate) struct NetworkAvatar;
 
+/// Stable identity used by replicated inventory and held-item state.
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NetworkAvatarId(pub(crate) u64);
+
 /// Server-only marker for a player controlled by a remote Lightyear peer.
 #[derive(Component)]
 pub(crate) struct NetworkPlayer;
@@ -56,6 +60,7 @@ pub(crate) struct NetworkPlayersPlugin;
 impl Plugin for NetworkPlayersPlugin {
     fn build(&self, app: &mut App) {
         app.component::<NetworkAvatar>().replicate();
+        app.component::<NetworkAvatarId>().replicate();
         app.add_systems(
             FixedPreUpdate,
             buffer_local_player_input.in_set(InputSystems::WriteClientInputs),
@@ -73,7 +78,9 @@ fn mark_local_player_as_network_avatar(
     trigger: On<Add<Player>>,
     mut commands: Commands,
 ) {
-    commands.entity(trigger.entity).insert(NetworkAvatar);
+    commands
+        .entity(trigger.entity)
+        .insert((NetworkAvatar, NetworkAvatarId(0)));
 }
 
 /// When Lightyear marks a replicated entity as Controlled, attach the native
@@ -111,7 +118,8 @@ fn add_input_marker_to_controlled_player(
 /// about to serialize, producing a connected client that never moves remotely.
 fn buffer_local_player_input(
     timeline: Res<LocalTimeline>,
-    local_input: Res<PlayerInput>,
+    mut local_input: ResMut<PlayerInput>,
+    status: Res<super::NetworkStatus>,
     local_players: Query<&Transform, With<Player>>,
     mut controlled_inputs: Query<
         &mut ActionState<NetworkPlayerInput>,
@@ -127,14 +135,23 @@ fn buffer_local_player_input(
         move_x: local_input.movement.x,
         move_y: local_input.movement.y,
         yaw,
+        pitch: local_input.pitch,
+        interact: local_input.interact_pressed,
         sprint: local_input.sprint,
         crouch: local_input.crouch,
         jump: local_input.jump_pressed,
     };
     packet.sanitize();
 
+    let mut wrote_client_input = false;
     for mut action_state in &mut controlled_inputs {
         action_state.0 = packet.clone();
+        wrote_client_input = true;
+    }
+    // Keep the edge buffered until a client-controlled pawn exists and a
+    // fixed-tick sample has actually been written. Host/offline input is local.
+    if status.mode != Some(super::NetworkMode::Client) || wrote_client_input {
+        local_input.interact_pressed = false;
     }
 
     trace!(
@@ -143,6 +160,9 @@ fn buffer_local_player_input(
         move_x = packet.move_x,
         move_y = packet.move_y,
         yaw = packet.yaw,
+        pitch = packet.pitch,
+        interact = packet.interact,
+        wrote_input = wrote_client_input,
         sprint = packet.sprint,
         crouch = packet.crouch,
         jump = packet.jump,
@@ -171,6 +191,7 @@ fn spawn_player_for_connected_peer(
         .spawn((
             NetworkPlayer,
             NetworkAvatar,
+            NetworkAvatarId(peer_id.to_bits().wrapping_add(1)),
             NetworkPlayerMotion::default(),
             ActionState::<NetworkPlayerInput>::default(),
             Transform::from_translation(spawn_position),

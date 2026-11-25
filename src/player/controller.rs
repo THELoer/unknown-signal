@@ -222,6 +222,8 @@ pub(crate) struct PlayerInput {
     pub(crate) sprint: bool,
     pub(crate) crouch: bool,
     pub(crate) jump_pressed: bool,
+    pub(crate) interact_pressed: bool,
+    pub(crate) pitch: f32,
 }
 
 fn spawn_player(mut commands: Commands) {
@@ -319,6 +321,7 @@ fn capture_player_input(
     settings: Res<PlayerSettings>,
     active: Res<GameplayActive>,
     mut player_input: ResMut<PlayerInput>,
+    cameras: Query<&CameraPitch, With<PlayerCamera>>,
 ) {
     if !active.0 {
         *player_input = PlayerInput::default();
@@ -334,6 +337,8 @@ fn capture_player_input(
     player_input.sprint = keyboard.pressed(settings.sprint);
     player_input.crouch = keyboard.pressed(settings.crouch);
     player_input.jump_pressed = keyboard.just_pressed(settings.jump);
+    player_input.interact_pressed |= keyboard.just_pressed(settings.interact);
+    player_input.pitch = cameras.single().map(|camera| camera.0).unwrap_or(0.0);
 }
 
 fn handle_cursor(
