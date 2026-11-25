@@ -1,8 +1,8 @@
 use bevy::{input::mouse::AccumulatedMouseScroll,prelude::*};
 use super::controller::{GameplayActive,PlayerStamina,STAMINA_MAX};
-#[derive(Component)]struct StaminaHud;#[derive(Component)]struct StaminaBarFill;
-#[derive(Resource,Default)]struct InventorySelection{selected:usize}
-#[derive(Component)]struct InventorySlotFrame{index:usize}
+#[derive(Component)]pub(super) struct StaminaHud;#[derive(Component)]pub(super) struct StaminaBarFill;
+#[derive(Resource,Default)]pub(super) struct InventorySelection{selected:usize}
+#[derive(Component)]pub(super) struct InventorySlotFrame{index:usize}
 pub(super)fn spawn_hud(mut commands:Commands,asset_server:Res<AssetServer>){
  commands.init_resource::<InventorySelection>();
  commands.spawn((Node{position_type:PositionType::Absolute,left:px(24),top:px(24),flex_direction:FlexDirection::Column,align_items:AlignItems::Start,row_gap:px(7),..default()},Name::new("Player Status HUD"))).with_children(|hud|{
