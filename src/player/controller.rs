@@ -111,7 +111,7 @@ impl Plugin for PlayerPlugin {
             .init_resource::<GameplayActive>()
             .init_resource::<PlayerSettings>()
             .init_resource::<PlayerStamina>()
-            .add_systems(Startup, (spawn_player, spawn_stamina_hud))
+            .add_systems(Startup, (spawn_player, spawn_camera_tool, spawn_stamina_hud).chain())
             .add_systems(
                 PreUpdate,
                 (
@@ -124,6 +124,8 @@ impl Plugin for PlayerPlugin {
                     .after(InputSystems),
             )
             .add_systems(PostUpdate, sync_cursor_capture)
+            .add_systems(PreUpdate, toggle_camera_tool.after(InputSystems))
+            .add_systems(Update, sync_camera_tool_visibility)
             .add_systems(FixedUpdate, move_player)
             .add_systems(
                 Update,
@@ -145,6 +147,104 @@ pub(super) struct PlayerCamera;
 
 #[derive(Component, Default)]
 pub(super) struct CameraPitch(pub(super) f32);
+
+
+#[derive(Resource, Default)]
+struct CameraToolState {
+    equipped: bool,
+}
+
+#[derive(Component)]
+struct CameraToolVisual;
+
+/// Spawn a simple first-person camera prop. Capture and viewfinder rendering
+/// are intentionally left for later Phase 3 steps.
+fn spawn_camera_tool(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    cameras: Query<Entity, With<PlayerCamera>>,
+) {
+    let body_mesh = meshes.add(Cuboid::new(0.28, 0.19, 0.13));
+    let lens_mesh = meshes.add(Cylinder::new(0.055, 0.13));
+    let flash_mesh = meshes.add(Cuboid::new(0.09, 0.035, 0.045));
+    let body_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.075, 0.095, 0.105),
+        metallic: 0.72,
+        perceptual_roughness: 0.42,
+        ..default()
+    });
+    let lens_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.12, 0.25, 0.29),
+        metallic: 0.88,
+        perceptual_roughness: 0.18,
+        ..default()
+    });
+    let flash_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.72, 0.49, 0.22),
+        metallic: 0.48,
+        perceptual_roughness: 0.36,
+        ..default()
+    });
+
+    for camera in &cameras {
+        commands.entity(camera).with_children(|children| {
+            children
+                .spawn((
+                    CameraToolVisual,
+                    Visibility::Hidden,
+                    Transform::from_xyz(0.28, -0.22, -0.55),
+                    Name::new("Handheld Research Camera"),
+                ))
+                .with_children(|tool| {
+                    tool.spawn((
+                        Mesh3d(body_mesh.clone()),
+                        MeshMaterial3d(body_material.clone()),
+                        Transform::default(),
+                    ));
+                    tool.spawn((
+                        Mesh3d(lens_mesh.clone()),
+                        MeshMaterial3d(lens_material.clone()),
+                        Transform::from_xyz(0.0, 0.0, -0.105)
+                            .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
+                    ));
+                    tool.spawn((
+                        Mesh3d(flash_mesh.clone()),
+                        MeshMaterial3d(flash_material.clone()),
+                        Transform::from_xyz(0.0, 0.115, 0.0),
+                    ));
+                });
+        });
+    }
+}
+
+fn toggle_camera_tool(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    active: Res<GameplayActive>,
+    mut state: ResMut<CameraToolState>,
+) {
+    if active.0 && keyboard.just_pressed(KeyCode::KeyC) {
+        state.equipped = !state.equipped;
+        info!(
+            "Research camera {}",
+            if state.equipped { "equipped" } else { "stowed" }
+        );
+    }
+}
+
+fn sync_camera_tool_visibility(
+    state: Res<CameraToolState>,
+    mut tools: Query<&mut Visibility, With<CameraToolVisual>>,
+) {
+    let visibility = if state.equipped {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    for mut tool in &mut tools {
+        *tool = visibility;
+    }
+}
 
 #[derive(Component)]
 struct Flashlight {
