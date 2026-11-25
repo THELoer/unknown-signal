@@ -388,7 +388,6 @@ fn toggle_pause(
     mut gameplay: ResMut<GameplayActive>,
     mut commands: Commands,
     overlays: Query<Entity, With<PauseOverlay>>,
-    _windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     if !keyboard.just_pressed(KeyCode::Escape) {
         return;
@@ -463,7 +462,6 @@ fn resume_from_pause_button(
     mut gameplay: ResMut<GameplayActive>,
     mut commands: Commands,
     overlays: Query<Entity, With<PauseOverlay>>,
-    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     if buttons.is_empty() {
         return;
