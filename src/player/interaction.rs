@@ -431,7 +431,7 @@ fn process_local_host_interaction(
         player,
         player_id.0,
         camera.translation,
-        *camera.forward(),
+        camera.forward(),
         &mut commands,
         &spatial_query,
         &collider_bodies,
@@ -469,7 +469,7 @@ fn process_remote_player_interactions(
         }
 
         let aim = Quat::from_rotation_y(input.yaw) * Quat::from_rotation_x(input.pitch);
-        let direction = aim * Vec3::NEG_Z;
+        let direction = Dir3::new(aim * Vec3::NEG_Z).unwrap_or(Dir3::NEG_Z);
         let origin = transform.translation + Vec3::Y * 0.55;
 
         apply_interaction_request(
@@ -493,7 +493,7 @@ fn apply_interaction_request(
     player: Entity,
     player_id: u64,
     origin: Vec3,
-    direction: Vec3,
+    direction: Dir3,
     commands: &mut Commands,
     spatial_query: &SpatialQuery,
     collider_bodies: &Query<&ColliderOf>,
@@ -511,7 +511,7 @@ fn apply_interaction_request(
             state.holder_id = None;
         }
 
-        let drop_position = origin + direction * DROP_DISTANCE + Vec3::Y * 0.15;
+        let drop_position = origin + *direction * DROP_DISTANCE + Vec3::Y * 0.15;
         commands.entity(item).remove::<HeldByServer>().insert((
             RigidBody::Dynamic,
             Collider::cuboid(
@@ -700,26 +700,12 @@ fn spawn_test_door(
     }
 }
 
-fn spawn_test_pickup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn spawn_test_pickup(mut commands: Commands) {
     // Only the host's root is authoritative. Clients discard their temporary
     // Startup copy and render the replicated root with a local mesh child.
-    let mesh = meshes.add(Cuboid::new(0.44, 0.44, 0.44));
-    let material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.34, 0.25, 0.15),
-        metallic: 0.28,
-        perceptual_roughness: 0.88,
-        ..default()
-    });
-
     commands.spawn((
         PickupItem,
         PickupState::default(),
-        Mesh3d(mesh),
-        MeshMaterial3d(material),
         RigidBody::Dynamic,
         Collider::cuboid(
             PICKUP_ITEM_HALF_EXTENT,
