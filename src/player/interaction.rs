@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::f32::consts::FRAC_PI_2;
 
 use avian3d::prelude::*;
@@ -21,6 +22,7 @@ const DOOR_HEIGHT: f32 = 2.2;
 const PICKUP_ITEM_HALF_EXTENT: f32 = 0.22;
 const HELD_ITEM_OFFSET: Vec3 = Vec3::new(0.28, -0.22, -0.85);
 const DROP_DISTANCE: f32 = 1.35;
+const INTERACTION_COOLDOWN_SECONDS: f32 = 0.20;
 
 /// Replicated state for a door. The animation timer is deliberately local:
 /// the server owns the actual Transform and clients receive its updates.
@@ -96,6 +98,7 @@ impl Plugin for InteractionPlugin {
             FixedUpdate,
             (
                 process_remote_player_interactions,
+                release_orphaned_held_items,
                 animate_doors,
                 follow_held_items,
             )
@@ -400,6 +403,8 @@ fn update_interaction_hud(
 /// path; its E press travels inside NetworkPlayerInput instead.
 fn process_local_host_interaction(
     mut commands: Commands,
+    time: Res<Time>,
+    mut cooldown: Local<f32>,
     active: Res<GameplayActive>,
     status: Res<NetworkStatus>,
     settings: Res<PlayerSettings>,
@@ -412,12 +417,15 @@ fn process_local_host_interaction(
     mut pickups: Query<(Entity, &mut PickupState), With<PickupItem>>,
     held_items: Query<(Entity, &HeldByServer), With<PickupItem>>,
 ) {
+    *cooldown = (*cooldown - time.delta_secs()).max(0.0);
     if !active.0
         || status.mode == Some(NetworkMode::Client)
         || !keyboard.just_pressed(settings.interact)
+        || *cooldown > 0.0
     {
         return;
     }
+    *cooldown = INTERACTION_COOLDOWN_SECONDS;
 
     let Ok((player, player_id)) = players.single() else {
         return;
@@ -446,6 +454,8 @@ fn process_local_host_interaction(
 /// mutate arbitrary entities by guessing their local Bevy IDs.
 fn process_remote_player_interactions(
     mut commands: Commands,
+    time: Res<Time>,
+    mut cooldowns: Local<HashMap<Entity, f32>>,
     players: Query<
         (
             Entity,
@@ -461,12 +471,17 @@ fn process_remote_player_interactions(
     mut pickups: Query<(Entity, &mut PickupState), With<PickupItem>>,
     held_items: Query<(Entity, &HeldByServer), With<PickupItem>>,
 ) {
+    cooldowns.retain(|entity, _| players.get(*entity).is_ok());
     for (player, transform, player_id, action_state) in &players {
+        let cooldown = cooldowns.entry(player).or_default();
+        *cooldown = (*cooldown - time.delta_secs()).max(0.0);
+
         let mut input = action_state.0.clone();
         input.sanitize();
-        if !input.interact {
+        if !input.interact || *cooldown > 0.0 {
             continue;
         }
+        *cooldown = INTERACTION_COOLDOWN_SECONDS;
 
         let aim = Quat::from_rotation_y(input.yaw) * Quat::from_rotation_x(input.pitch);
         let direction = Dir3::new(aim * Vec3::NEG_Z).unwrap_or(Dir3::NEG_Z);
@@ -568,6 +583,35 @@ fn apply_interaction_request(
             "Player {player_id} {} a network door",
             if state.is_open { "opened" } else { "closed" }
         );
+    }
+}
+
+/// If a player disconnects while carrying an item, release it back into the
+/// world instead of leaving a permanently hidden, collider-less object.
+fn release_orphaned_held_items(
+    mut commands: Commands,
+    held_items: Query<(Entity, &HeldByServer), With<PickupItem>>,
+    players: Query<(), Or<(With<Player>, With<NetworkPlayer>)>>,
+    mut pickup_states: Query<&mut PickupState>,
+) {
+    for (item, holder) in &held_items {
+        if players.get(holder.0).is_ok() {
+            continue;
+        }
+
+        if let Ok(mut state) = pickup_states.get_mut(item) {
+            state.holder_id = None;
+        }
+        commands.entity(item).remove::<HeldByServer>().insert((
+            RigidBody::Dynamic,
+            Collider::cuboid(
+                PICKUP_ITEM_HALF_EXTENT,
+                PICKUP_ITEM_HALF_EXTENT,
+                PICKUP_ITEM_HALF_EXTENT,
+            ),
+            LinearVelocity::default(),
+        ));
+        warn!("Released a carried item after its owner disconnected");
     }
 }
 
