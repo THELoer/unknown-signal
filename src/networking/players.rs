@@ -191,7 +191,7 @@ fn spawn_player_for_connected_peer(
         .spawn((
             NetworkPlayer,
             NetworkAvatar,
-            NetworkAvatarId(peer_id.to_bits()),
+            NetworkAvatarId(peer_id.to_bits().wrapping_add(1)),
             NetworkPlayerMotion::default(),
             ActionState::<NetworkPlayerInput>::default(),
             Transform::from_translation(spawn_position),
