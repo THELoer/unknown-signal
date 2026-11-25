@@ -1,5 +1,5 @@
 mod menu;
-mod networking;
+pub(crate) mod networking;
 mod player;
 
 use avian3d::prelude::{Collider, PhysicsPlugins, RigidBody};
