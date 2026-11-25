@@ -37,6 +37,11 @@ struct NetworkPlayerMotion {
     vertical_velocity: f32,
 }
 
+/// Marker replicated with every server-owned player root. It identifies an
+/// actual player pawn, rather than every entity carrying a replicated Transform.
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
+pub(crate) struct NetworkPlayerPawn;
+
 /// Visual marker added to client-side remote copies after their first
 /// frame. The mesh is a child of the replicated root and therefore inherits
 /// the server-authored position and rotation.
@@ -71,12 +76,11 @@ fn add_input_marker_to_controlled_player(
     // the server-controlled entity arrives, align that rig with its assigned
     // authoritative spawn transform so the owner does not appear at a second,
     // unrelated location in the level.
-    if let (Ok(authoritative), Ok(mut local)) = (
-        authoritative_players.get(trigger.entity),
-        local_players.single_mut(),
-    ) {
-        local.translation = authoritative.translation;
-        local.rotation = authoritative.rotation;
+    if let Ok(authoritative) = authoritative_players.get(trigger.entity) {
+        if let Ok(mut local) = local_players.single_mut() {
+            local.translation = authoritative.translation;
+            local.rotation = authoritative.rotation;
+        }
     }
 
     commands
@@ -153,6 +157,7 @@ fn spawn_player_for_connected_peer(
     let player = commands
         .spawn((
             NetworkPlayer,
+            NetworkPlayerPawn,
             NetworkPlayerMotion::default(),
             ActionState::<NetworkPlayerInput>::default(),
             Transform::from_translation(spawn_position),
@@ -187,7 +192,7 @@ fn simulate_authoritative_players(
             &ActionState<NetworkPlayerInput>,
             &mut NetworkPlayerMotion,
         ),
-        With<NetworkPlayer>,
+        (With<NetworkPlayer>, Without<Remote>),
     >,
 ) {
     for (mut transform, action_state, mut motion) in &mut players {
@@ -240,10 +245,9 @@ fn movement_speed(input: &NetworkPlayerInput) -> f32 {
     }
 }
 
-/// Lightyear's Remote marker is present on the received server entity. This
-/// matches the existing host-avatar path and gives remote client players the
-/// same visual representation. The owning client is excluded because its
-/// first-person controller already occupies that authoritative position.
+/// Render replicated player pawns that belong to another peer. `Remote` alone
+/// is not enough: all Transform-replicated entities can match it. `Controlled`
+/// marks the pawn owned by this client, whose first-person rig is the visual.
 fn spawn_remote_player_visuals(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -252,6 +256,7 @@ fn spawn_remote_player_visuals(
         Entity,
         (
             With<Remote>,
+            With<NetworkPlayerPawn>,
             Without<Controlled>,
             Without<NetworkPlayerVisual>,
         ),
@@ -294,6 +299,13 @@ fn spawn_remote_player_visuals(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn player_pawn_marker_is_a_component() {
+        let mut world = World::new();
+        let entity = world.spawn(NetworkPlayerPawn).id();
+        assert!(world.entity(entity).contains::<NetworkPlayerPawn>());
+    }
 
     #[test]
     fn forward_input_moves_toward_negative_z() {
