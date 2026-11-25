@@ -12,8 +12,8 @@ use lightyear::prelude::{
 };
 
 mod diagnostics;
-mod players;
-mod protocol;
+pub(crate) mod players;
+pub(crate) mod protocol;
 
 const SERVER_PORT: u16 = 5000;
 const TICK_RATE: f64 = 64.0;
