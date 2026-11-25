@@ -116,6 +116,7 @@ impl Plugin for PlayerPlugin {
                 PreUpdate,
                 (
                     toggle_pause,
+                    sync_cursor_capture,
                     capture_player_input,
                     update_camera_look,
                     toggle_flashlight,
@@ -360,6 +361,25 @@ struct PauseOverlay;
 
 #[derive(Component)]
 struct ResumePauseButton;
+
+/// Enforce cursor capture from the gameplay state every frame. This also covers
+/// menu-to-game transitions and button-based resume, so no UI path can leave the
+/// cursor in the wrong mode for the next gameplay frame.
+fn sync_cursor_capture(
+    active: Res<GameplayActive>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
+) {
+    let (grab_mode, visible) = if active.0 {
+        (CursorGrabMode::Locked, false)
+    } else {
+        (CursorGrabMode::None, true)
+    };
+
+    for mut cursor in &mut windows {
+        cursor.grab_mode = grab_mode;
+        cursor.visible = visible;
+    }
+}
 
 /// Escape pauses only this local player's controls and UI. The networking
 /// plugin and authoritative server simulation keep running for other peers.
