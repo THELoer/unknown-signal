@@ -31,6 +31,23 @@ struct RemoteInteractionInputState {
     was_pressed: bool,
 }
 
+impl RemoteInteractionInputState {
+    /// Convert the buffered network button state into one server-side action.
+    fn update(&mut self, pressed: bool) -> bool {
+        self.cooldown_seconds =
+            (self.cooldown_seconds - NETWORK_TICK_SECONDS).max(0.0);
+        let pressed_edge = pressed && !self.was_pressed;
+        self.was_pressed = pressed;
+
+        if pressed_edge && self.cooldown_seconds <= 0.0 {
+            self.cooldown_seconds = INTERACTION_COOLDOWN_SECONDS;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Replicated state for a door. The animation timer is deliberately local:
 /// the server owns the actual Transform and clients receive its updates.
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -480,17 +497,11 @@ fn process_remote_player_interactions(
     input_states.retain(|entity, _| players.get(*entity).is_ok());
     for (player, transform, player_id, action_state) in &players {
         let state = input_states.entry(player).or_default();
-        state.cooldown_seconds =
-            (state.cooldown_seconds - NETWORK_TICK_SECONDS).max(0.0);
-
         let mut input = action_state.0.clone();
         input.sanitize();
-        let pressed_edge = input.interact && !state.was_pressed;
-        state.was_pressed = input.interact;
-        if !pressed_edge || state.cooldown_seconds > 0.0 {
+        if !state.update(input.interact) {
             continue;
         }
-        state.cooldown_seconds = INTERACTION_COOLDOWN_SECONDS;
 
         debug!(
             target: "unknown_signal::interaction",
@@ -828,6 +839,28 @@ fn spawn_frame_piece(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buffered_interaction_input_triggers_once_until_released() {
+        let mut state = RemoteInteractionInputState::default();
+
+        assert!(state.update(true));
+        assert!(!state.update(true));
+        assert!(!state.update(true));
+        assert!(!state.update(false));
+        assert!(!state.update(true));
+    }
+
+    #[test]
+    fn interaction_input_requires_a_new_press_after_cooldown() {
+        let mut state = RemoteInteractionInputState::default();
+
+        assert!(state.update(true));
+        for _ in 0..20 {
+            state.update(false);
+        }
+        assert!(state.update(true));
+    }
 
     #[test]
     fn a_new_door_starts_closed() {
