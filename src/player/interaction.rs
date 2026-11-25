@@ -23,6 +23,7 @@ const PICKUP_ITEM_HALF_EXTENT: f32 = 0.22;
 const HELD_ITEM_OFFSET: Vec3 = Vec3::new(0.28, -0.22, -0.85);
 const DROP_DISTANCE: f32 = 1.35;
 const INTERACTION_COOLDOWN_SECONDS: f32 = 0.20;
+const NETWORK_TICK_SECONDS: f32 = 1.0 / 64.0;
 
 /// Replicated state for a door. The animation timer is deliberately local:
 /// the server owns the actual Transform and clients receive its updates.
@@ -91,6 +92,7 @@ impl Plugin for InteractionPlugin {
                 update_remote_pickup_collision,
                 update_interaction_hud,
                 process_local_host_interaction,
+                animate_doors,
             )
                 .chain(),
         )
@@ -99,7 +101,6 @@ impl Plugin for InteractionPlugin {
             (
                 process_remote_player_interactions,
                 release_orphaned_held_items,
-                animate_doors,
                 follow_held_items,
             )
                 .chain(),
@@ -454,7 +455,6 @@ fn process_local_host_interaction(
 /// mutate arbitrary entities by guessing their local Bevy IDs.
 fn process_remote_player_interactions(
     mut commands: Commands,
-    time: Res<Time>,
     mut cooldowns: Local<HashMap<Entity, f32>>,
     players: Query<
         (
@@ -474,7 +474,7 @@ fn process_remote_player_interactions(
     cooldowns.retain(|entity, _| players.get(*entity).is_ok());
     for (player, transform, player_id, action_state) in &players {
         let cooldown = cooldowns.entry(player).or_default();
-        *cooldown = (*cooldown - time.delta_secs()).max(0.0);
+        *cooldown = (*cooldown - NETWORK_TICK_SECONDS).max(0.0);
 
         let mut input = action_state.0.clone();
         input.sanitize();
