@@ -301,6 +301,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn player_pawn_marker_is_a_component() {
+        let mut world = World::new();
+        let entity = world.spawn(NetworkPlayerPawn).id();
+        assert!(world.entity(entity).contains::<NetworkPlayerPawn>());
+    }
+
+    #[test]
     fn forward_input_moves_toward_negative_z() {
         let input = NetworkPlayerInput {
             move_y: 1.0,
