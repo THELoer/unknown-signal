@@ -65,7 +65,10 @@ impl Plugin for NetworkPlayersPlugin {
             buffer_local_player_input.in_set(InputSystems::WriteClientInputs),
         )
         .add_systems(FixedUpdate, simulate_authoritative_players)
-        .add_systems(Update, spawn_remote_player_visuals)
+        .add_systems(
+            Update,
+            (spawn_remote_player_visuals, sync_local_player_position).chain(),
+        )
         .add_observer(mark_local_player_as_network_avatar)
         .add_observer(add_input_marker_to_controlled_player)
         .add_observer(spawn_player_for_connected_peer);
@@ -105,6 +108,24 @@ fn add_input_marker_to_controlled_player(
         "Controlled player entity {:?} received by this client",
         trigger.entity
     );
+}
+
+/// Keep the client's first-person rig at the replicated authoritative pawn position.
+/// The local controller is a separate entity (it owns the camera and local physics),
+/// while the Controlled entity is the server-owned pawn rendered on the host. Aligning
+/// only once at connection time lets those two transforms drift apart during play.
+/// Rotation stays local for immediate mouse-look; the same yaw is sent in input packets.
+fn sync_local_player_position(
+    controlled_players: Query<&Transform, (With<Controlled>, With<NetworkAvatar>)>,
+    mut local_players: Query<&mut Transform, With<Player>>,
+) {
+    let (Ok(authoritative), Ok(mut local)) =
+        (controlled_players.single(), local_players.single_mut())
+    else {
+        return;
+    };
+
+    local.translation = authoritative.translation;
 }
 
 /// Capture the local controller state into Lightyear's fixed-tick input buffer.
@@ -177,8 +198,12 @@ fn spawn_player_for_connected_peer(
     // the shared door and pickup area. The old wide X lanes and Z=0 spawn
     // could leave a new client several metres out of interaction reach and
     // facing away from every replicated test object.
+    // Keep every initial pawn inside the pickup's half-width so the default
+    // forward aim can reach the shared test objects immediately. Wide spawn
+    // lanes made some peers look at the door/item from an offset that their
+    // camera and authoritative ray did not share.
     let spawn_lane = (peer_id.to_bits() % 4) as f32 - 1.5;
-    let spawn_position = Vec3::new(spawn_lane * 0.75, PLAYER_GROUND_HEIGHT, 5.0);
+    let spawn_position = Vec3::new(spawn_lane * 0.12, PLAYER_GROUND_HEIGHT, 5.0);
 
     let player = commands
         .spawn((
