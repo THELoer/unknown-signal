@@ -44,6 +44,7 @@ impl NetworkPlayerInput {
         self.move_y = finite_axis(self.move_y);
         self.yaw = if self.yaw.is_finite() { self.yaw } else { 0.0 };
         self.pitch = if self.pitch.is_finite() { self.pitch.clamp(-1.52, 1.52) } else { 0.0 };
+        self.interact = self.interact; // The action edge is boolean and needs no numeric sanitization.
         let length = self.move_x.hypot(self.move_y);
         if length > 1.0 {
             self.move_x /= length;
@@ -112,6 +113,21 @@ mod tests {
         assert!(input.move_x <= 1.0);
         assert!(input.move_y <= 1.0);
         assert!((input.move_x.hypot(input.move_y) - 1.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn sanitize_clamps_pitch_without_losing_interaction_edge() {
+        let mut input = NetworkPlayerInput {
+            pitch: 9.0,
+            interact: true,
+            ..default()
+        };
+
+        input.sanitize();
+
+        assert!(input.pitch <= 1.52);
+        assert!(input.pitch >= -1.52);
+        assert!(input.interact);
     }
 
     #[test]
