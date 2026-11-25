@@ -169,9 +169,7 @@ fn configure_network_world_objects(
                 commands.entity(entity).despawn();
                 removed += 1;
             }
-            info!(
-                "Removed {removed} local door/item placeholder(s); waiting for host world state"
-            );
+            info!("Removed {removed} local door/item placeholder(s); waiting for host world state");
         }
     }
 
@@ -215,7 +213,11 @@ fn attach_network_object_visuals(
     for entity in &doors {
         let is_remote = remote_entities.get(entity).is_ok();
         let mut door = commands.entity(entity);
-        door.insert((DoorVisual, Visibility::default(), InheritedVisibility::default()));
+        door.insert((
+            DoorVisual,
+            Visibility::default(),
+            InheritedVisibility::default(),
+        ));
         if is_remote {
             // Replicated roots do not receive Avian components. Add a local
             // kinematic body so the child collider participates in raycasts.
@@ -226,8 +228,11 @@ fn attach_network_object_visuals(
             children.spawn((
                 Mesh3d(cube.clone()),
                 MeshMaterial3d(door_material.clone()),
-                Transform::from_xyz(DOOR_WIDTH * 0.5, 0.0, 0.0)
-                    .with_scale(Vec3::new(DOOR_WIDTH, DOOR_HEIGHT, 0.14)),
+                Transform::from_xyz(DOOR_WIDTH * 0.5, 0.0, 0.0).with_scale(Vec3::new(
+                    DOOR_WIDTH,
+                    DOOR_HEIGHT,
+                    0.14,
+                )),
                 Name::new("Replicated Door Leaf"),
             ));
             children.spawn((
@@ -248,7 +253,11 @@ fn attach_network_object_visuals(
     for (entity, state) in &pickups {
         let is_remote = remote_entities.get(entity).is_ok();
         let mut pickup = commands.entity(entity);
-        pickup.insert((PickupVisual, Visibility::default(), InheritedVisibility::default()));
+        pickup.insert((
+            PickupVisual,
+            Visibility::default(),
+            InheritedVisibility::default(),
+        ));
 
         if is_remote {
             pickup.insert(RigidBody::Kinematic);
@@ -276,10 +285,7 @@ fn attach_network_object_visuals(
 /// carried item has no collider, so it cannot be picked up by a second player.
 fn update_remote_pickup_collision(
     mut commands: Commands,
-    pickups: Query<
-        (Entity, &PickupState),
-        (With<PickupItem>, With<Remote>, Changed<PickupState>),
-    >,
+    pickups: Query<(Entity, &PickupState), (With<PickupItem>, With<Remote>, Changed<PickupState>)>,
 ) {
     for (entity, state) in &pickups {
         if state.holder_id.is_some() {
@@ -373,9 +379,8 @@ fn update_interaction_hud(
     mut held_text: Query<&mut Text, (With<HeldItemText>, Without<InteractionPromptText>)>,
 ) {
     let local_id = local_network_avatar_id(&status, &local_players, &controlled_players);
-    let carrying_item = local_id.is_some_and(|id| {
-        items.iter().any(|(_, state)| state.holder_id == Some(id))
-    });
+    let carrying_item =
+        local_id.is_some_and(|id| items.iter().any(|(_, state)| state.holder_id == Some(id)));
 
     let mut prompt = String::new();
     if active.0 {
@@ -571,13 +576,8 @@ fn apply_interaction_request(
     }
 
     let filter = SpatialQueryFilter::from_excluded_entities([player]);
-    let Some(hit) = spatial_query.cast_ray(
-        origin,
-        direction,
-        INTERACTION_DISTANCE,
-        true,
-        &filter,
-    ) else {
+    let Some(hit) = spatial_query.cast_ray(origin, direction, INTERACTION_DISTANCE, true, &filter)
+    else {
         debug!(
             target: "unknown_signal::interaction",
             player_id,
@@ -709,12 +709,7 @@ fn animate_doors(
 /// This also means a disconnect cannot leave a client-owned item transform.
 fn follow_held_items(
     mut pickups: Query<(&mut Transform, &HeldByServer), With<PickupItem>>,
-    players: Query<
-        (
-            Entity,
-            &Transform,
-            Option<&ActionState<NetworkPlayerInput>>,
-        ),
+    players: Query<(Entity, &Transform, Option<&ActionState<NetworkPlayerInput>>),
         (Or<(With<Player>, With<NetworkPlayer>)>, Without<PickupItem>),
     >,
     local_input: Res<PlayerInput>,
