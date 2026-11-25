@@ -82,8 +82,8 @@ fn add_input_marker_to_controlled_player(
     commands
         .entity(trigger.entity)
         .insert(InputMarker::<NetworkPlayerInput>::default());
-    debug!(
-        "Added network input marker to controlled player {:?}",
+    info!(
+        "Controlled player entity {:?} received by this client",
         trigger.entity
     );
 }
@@ -286,8 +286,8 @@ fn spawn_remote_player_visuals(
                 Name::new("Remote Network Player Avatar"),
             ));
 
-        debug!(
-            "Attached network player visual to remote entity {:?}",
+        info!(
+            "Attached remote player visual to replicated entity {:?}",
             entity
         );
     }
