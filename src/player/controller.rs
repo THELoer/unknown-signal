@@ -6,6 +6,9 @@ use bevy::{
     input::{InputSystems, mouse::AccumulatedMouseMotion},
     post_process::effect_stack::{ChromaticAberration, Vignette},
     prelude::*,
+    picking::hover::Hovered,
+    ui::Pressed,
+    ui_widgets::Button,
     window::{CursorGrabMode, CursorOptions, PrimaryWindow},
 };
 
@@ -19,6 +22,7 @@ const STAMINA_MAX: f32 = 100.0;
 const SPRINT_DRAIN_PER_SECOND: f32 = 26.0;
 const STAMINA_REGEN_PER_SECOND: f32 = 18.0;
 const STAMINA_REGEN_DELAY: f32 = 0.85;
+const INTERACTION_INPUT_BUFFER_SECONDS: f32 = 0.20;
 
 #[derive(Resource, Default)]
 pub struct GameplayActive(pub bool);
@@ -111,7 +115,7 @@ impl Plugin for PlayerPlugin {
             .add_systems(
                 PreUpdate,
                 (
-                    handle_cursor,
+                    toggle_pause,
                     capture_player_input,
                     update_camera_look,
                     toggle_flashlight,
@@ -120,7 +124,7 @@ impl Plugin for PlayerPlugin {
                     .after(InputSystems),
             )
             .add_systems(FixedUpdate, move_player)
-            .add_systems(Update, (update_camera_stance, update_stamina_hud));
+            .add_systems(Update, (resume_from_pause_button, update_camera_stance, update_stamina_hud));
     }
 }
 
@@ -223,6 +227,7 @@ pub(crate) struct PlayerInput {
     pub(crate) crouch: bool,
     pub(crate) jump_pressed: bool,
     pub(crate) interact_pressed: bool,
+    pub(crate) interaction_buffer_seconds: f32,
     pub(crate) pitch: f32,
 }
 
@@ -318,6 +323,7 @@ fn update_camera_stance(
 
 fn capture_player_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
     settings: Res<PlayerSettings>,
     active: Res<GameplayActive>,
     mut player_input: ResMut<PlayerInput>,
@@ -337,23 +343,126 @@ fn capture_player_input(
     player_input.sprint = keyboard.pressed(settings.sprint);
     player_input.crouch = keyboard.pressed(settings.crouch);
     player_input.jump_pressed = keyboard.just_pressed(settings.jump);
-    player_input.interact_pressed |= keyboard.just_pressed(settings.interact);
+    if keyboard.just_pressed(settings.interact) {
+        player_input.interaction_buffer_seconds = INTERACTION_INPUT_BUFFER_SECONDS;
+    }
+    player_input.interaction_buffer_seconds =
+        (player_input.interaction_buffer_seconds - time.delta_secs()).max(0.0);
+    player_input.interact_pressed = player_input.interaction_buffer_seconds > 0.0;
     player_input.pitch = cameras.single().map(|camera| camera.0).unwrap_or(0.0);
 }
 
-fn handle_cursor(
+#[derive(Component)]
+struct PauseOverlay;
+
+#[derive(Component)]
+struct ResumePauseButton;
+
+/// Escape pauses only this local player's controls and UI. The networking
+/// plugin and authoritative server simulation keep running for other peers.
+fn toggle_pause(
     keyboard: Res<ButtonInput<KeyCode>>,
-    active: Res<GameplayActive>,
+    mut gameplay: ResMut<GameplayActive>,
+    mut commands: Commands,
+    overlays: Query<Entity, With<PauseOverlay>>,
     mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
-    if !active.0 || !keyboard.just_pressed(KeyCode::Escape) {
+    if !keyboard.just_pressed(KeyCode::Escape) {
         return;
     }
 
-    for mut cursor in &mut windows {
-        cursor.grab_mode = CursorGrabMode::None;
-        cursor.visible = true;
+    if gameplay.0 {
+        gameplay.0 = false;
+        commands
+            .spawn((
+                PauseOverlay,
+                GlobalZIndex(100),
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: percent(100),
+                    height: percent(100),
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.008, 0.014, 0.020, 0.88)),
+            ))
+            .with_children(|root| {
+                root.spawn((
+                    Node {
+                        width: px(360),
+                        padding: UiRect::all(px(30)),
+                        row_gap: px(22),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.025, 0.040, 0.050)),
+                ))
+                .with_children(|panel| {
+                    panel.spawn((
+                        Text::new("PAUSED"),
+                        TextFont { font_size: FontSize::Px(32.0), ..default() },
+                        TextColor(Color::srgb(0.86, 0.91, 0.91)),
+                    ));
+                    panel.spawn((
+                        Button,
+                        Hovered::default(),
+                        ResumePauseButton,
+                        Node {
+                            width: percent(100),
+                            padding: UiRect::axes(px(22), px(13)),
+                            justify_content: JustifyContent::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.10, 0.25, 0.24)),
+                    ))
+                    .with_child((
+                        Text::new("RESUME  ·  ESC"),
+                        TextFont { font_size: FontSize::Px(16.0), ..default() },
+                        TextColor(Color::srgb(0.88, 0.93, 0.91)),
+                    ));
+                });
+            });
+
+        for mut cursor in &mut windows {
+            cursor.grab_mode = CursorGrabMode::None;
+            cursor.visible = true;
+        }
+        info!("Gameplay paused locally");
+    } else if !overlays.is_empty() {
+        gameplay.0 = true;
+        for entity in &overlays {
+            commands.entity(entity).despawn();
+        }
+        for mut cursor in &mut windows {
+            cursor.grab_mode = CursorGrabMode::Locked;
+            cursor.visible = false;
+        }
+        info!("Gameplay resumed locally");
     }
+}
+
+fn resume_from_pause_button(
+    buttons: Query<(), (With<ResumePauseButton>, Added<Pressed>)>,
+    mut gameplay: ResMut<GameplayActive>,
+    mut commands: Commands,
+    overlays: Query<Entity, With<PauseOverlay>>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
+) {
+    if buttons.is_empty() {
+        return;
+    }
+
+    gameplay.0 = true;
+    for entity in &overlays {
+        commands.entity(entity).despawn();
+    }
+    for mut cursor in &mut windows {
+        cursor.grab_mode = CursorGrabMode::Locked;
+        cursor.visible = false;
+    }
+    info!("Gameplay resumed from pause menu");
 }
 
 fn update_camera_look(
