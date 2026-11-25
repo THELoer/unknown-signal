@@ -14,6 +14,7 @@ use lightyear::prelude::server::*;
 use lightyear::prelude::*;
 
 use super::protocol::NetworkPlayerInput;
+use serde::{Deserialize, Serialize};
 use crate::player::{Player, PlayerInput};
 
 const NETWORK_TICK_RATE: f32 = 64.0;
@@ -29,7 +30,7 @@ const PLAYER_SPAWN_SPACING: f32 = 1.4;
 
 /// Replicated identity marker shared by every network-visible player root.
 /// Unlike Lightyear's Remote marker, this cannot match transport/link entities.
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 pub(crate) struct NetworkAvatar;
 
 /// Server-only marker for a player controlled by a remote Lightyear peer.

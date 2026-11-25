@@ -264,7 +264,7 @@ fn update_network_diagnostics(
                 With<lightyear::prelude::client::Remote>,
                 With<players::NetworkPlayer>,
             )>,
-            Without<lightyear::prelude::client::Controlled>,
+            Without<Controlled>,
         ),
     >,
     mut diagnostics: ResMut<NetworkDiagnostics>,
