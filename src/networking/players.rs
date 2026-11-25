@@ -14,8 +14,8 @@ use lightyear::prelude::server::*;
 use lightyear::prelude::*;
 
 use super::protocol::NetworkPlayerInput;
-use serde::{Deserialize, Serialize};
 use crate::player::{Player, PlayerInput};
+use serde::{Deserialize, Serialize};
 
 const NETWORK_TICK_RATE: f32 = 64.0;
 const NETWORK_TICK_SECONDS: f32 = 1.0 / NETWORK_TICK_RATE;
@@ -26,7 +26,6 @@ const PLAYER_GRAVITY: f32 = 20.0;
 const PLAYER_JUMP_SPEED: f32 = 5.5;
 const PLAYER_TERMINAL_VELOCITY: f32 = 45.0;
 const PLAYER_GROUND_HEIGHT: f32 = 1.0;
-const PLAYER_SPAWN_SPACING: f32 = 1.4;
 
 /// Replicated identity marker shared by every network-visible player root.
 /// Unlike Lightyear's Remote marker, this cannot match transport/link entities.
@@ -74,10 +73,7 @@ impl Plugin for NetworkPlayersPlugin {
 }
 
 /// The host's local first-person player is also replicated to remote peers.
-fn mark_local_player_as_network_avatar(
-    trigger: On<Add<Player>>,
-    mut commands: Commands,
-) {
+fn mark_local_player_as_network_avatar(trigger: On<Add<Player>>, mut commands: Commands) {
     commands
         .entity(trigger.entity)
         .insert((NetworkAvatar, NetworkAvatarId(0)));
@@ -118,8 +114,7 @@ fn add_input_marker_to_controlled_player(
 /// about to serialize, producing a connected client that never moves remotely.
 fn buffer_local_player_input(
     timeline: Res<LocalTimeline>,
-    mut local_input: ResMut<PlayerInput>,
-    status: Res<super::NetworkStatus>,
+    local_input: Res<PlayerInput>,
     local_players: Query<&Transform, With<Player>>,
     mut controlled_inputs: Query<
         &mut ActionState<NetworkPlayerInput>,
@@ -148,12 +143,6 @@ fn buffer_local_player_input(
         action_state.0 = packet.clone();
         wrote_client_input = true;
     }
-    // Keep the edge buffered until a client-controlled pawn exists and a
-    // fixed-tick sample has actually been written. Host/offline input is local.
-    if status.mode != Some(super::NetworkMode::Client) || wrote_client_input {
-        local_input.interact_pressed = false;
-    }
-
     trace!(
         target: "unknown_signal::network",
         tick = timeline.tick().0,
@@ -184,8 +173,12 @@ fn spawn_player_for_connected_peer(
     };
 
     let peer_id = remote_id.0;
-    let spawn_lane = (peer_id.to_bits() % 7) as f32 - 3.0;
-    let spawn_position = Vec3::new(spawn_lane * PLAYER_SPAWN_SPACING, PLAYER_GROUND_HEIGHT, 0.0);
+    // Place remote players beside the host's test-scene start point, facing
+    // the shared door and pickup area. The old wide X lanes and Z=0 spawn
+    // could leave a new client several metres out of interaction reach and
+    // facing away from every replicated test object.
+    let spawn_lane = (peer_id.to_bits() % 4) as f32 - 1.5;
+    let spawn_position = Vec3::new(spawn_lane * 0.75, PLAYER_GROUND_HEIGHT, 5.0);
 
     let player = commands
         .spawn((

@@ -43,7 +43,11 @@ impl NetworkPlayerInput {
         self.move_x = finite_axis(self.move_x);
         self.move_y = finite_axis(self.move_y);
         self.yaw = if self.yaw.is_finite() { self.yaw } else { 0.0 };
-        self.pitch = if self.pitch.is_finite() { self.pitch.clamp(-1.52, 1.52) } else { 0.0 };
+        self.pitch = if self.pitch.is_finite() {
+            self.pitch.clamp(-1.52, 1.52)
+        } else {
+            0.0
+        };
         let length = self.move_x.hypot(self.move_y);
         if length > 1.0 {
             self.move_x /= length;
