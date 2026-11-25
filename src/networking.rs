@@ -7,8 +7,8 @@ use lightyear::connection::server::Start;
 use lightyear::prelude::client::{ClientPlugins, Connect, RawClient};
 use lightyear::prelude::server::{LinkOf, RawServer, ServerPlugins, ServerUdpIo};
 use lightyear::prelude::{
-    AppComponentExt, Client, Connected, Controlled, Link, LocalAddr, NetworkTarget, PeerAddr, Replicate,
-    ReplicationReceiver, ReplicationSender, UdpIo,
+    AppComponentExt, Client, Connected, Controlled, Link, LocalAddr, NetworkTarget, PeerAddr,
+    Replicate, ReplicationReceiver, ReplicationSender, UdpIo,
 };
 
 mod diagnostics;
