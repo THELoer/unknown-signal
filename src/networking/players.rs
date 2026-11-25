@@ -119,6 +119,7 @@ fn add_input_marker_to_controlled_player(
 fn buffer_local_player_input(
     timeline: Res<LocalTimeline>,
     mut local_input: ResMut<PlayerInput>,
+    status: Res<super::NetworkStatus>,
     local_players: Query<&Transform, With<Player>>,
     mut controlled_inputs: Query<
         &mut ActionState<NetworkPlayerInput>,
@@ -142,12 +143,16 @@ fn buffer_local_player_input(
     };
     packet.sanitize();
 
+    let mut wrote_client_input = false;
     for mut action_state in &mut controlled_inputs {
         action_state.0 = packet.clone();
+        wrote_client_input = true;
     }
-    // The interaction key is an edge, not a held action. Consume it after
-    // the first fixed-tick sample so low frame rates cannot duplicate actions.
-    local_input.interact_pressed = false;
+    // Keep the edge buffered until a client-controlled pawn exists and a
+    // fixed-tick sample has actually been written. Host/offline input is local.
+    if status.mode != Some(super::NetworkMode::Client) || wrote_client_input {
+        local_input.interact_pressed = false;
+    }
 
     trace!(
         target: "unknown_signal::network",
