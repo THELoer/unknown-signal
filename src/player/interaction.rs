@@ -587,19 +587,18 @@ fn apply_interaction_request(
 
     // A free pickup can be claimed by exactly one player. The server checks
     // the replicated state before inserting its private holder Entity.
-    let pickup_entity = pickups
-        .get_mut(hit.entity)
-        .map(|(entity, _)| entity)
-        .or_else(|_| {
-            collider_bodies
-                .get(hit.entity)
-                .ok()
-                .map(|collider| collider.body)
-                .and_then(|body| pickups.get_mut(body).ok().map(|(entity, _)| entity))
-                .ok_or(())
-        });
+    let pickup_entity = if let Ok((entity, _)) = pickups.get_mut(hit.entity) {
+        Some(entity)
+    } else if let Ok(collider) = collider_bodies.get(hit.entity) {
+        pickups
+            .get_mut(collider.body)
+            .ok()
+            .map(|(entity, _)| entity)
+    } else {
+        None
+    };
 
-    if let Ok(item) = pickup_entity {
+    if let Some(item) = pickup_entity {
         if let Ok((_, mut state)) = pickups.get_mut(item) {
             if state.holder_id.is_some() {
                 debug!("Player {player_id} attempted to take an already-held item");
