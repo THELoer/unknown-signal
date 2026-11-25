@@ -128,11 +128,18 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems(PostUpdate, sync_cursor_capture)
             .add_systems(PreUpdate, toggle_camera_tool.after(InputSystems))
-            .add_systems(Update, (sync_camera_tool_visibility, hud::update_inventory_selection, hud::sync_inventory_selection))
+            .add_systems(
+                Update,
+                (
+                    sync_camera_tool_visibility,
+                    hud::update_inventory_selection,
+                    hud::sync_inventory_selection,
+                ),
+            )
             .add_systems(FixedUpdate, move_player)
             .add_systems(
                 Update,
-                (resume_from_pause_button, update_camera_stance, update_stamina_hud),
+                (resume_from_pause_button, update_camera_stance, hud::update_stamina_hud),
             );
     }
 }
